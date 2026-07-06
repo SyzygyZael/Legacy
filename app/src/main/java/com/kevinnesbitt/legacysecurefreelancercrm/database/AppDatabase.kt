@@ -1,6 +1,7 @@
 package com.kevinnesbitt.legacysecurefreelancercrm.database
 
 import android.content.Context
+import android.icu.util.Currency
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -10,6 +11,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.Update
 import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.internal.synchronized
@@ -19,7 +21,7 @@ data class ClientDataEntity(
     @PrimaryKey(autoGenerate = true) val id: Int,
     val name: String,
     val email: String,
-    val hourlyRate: Double,
+    val payRate: Double,
     val currency: String
 )
 
@@ -104,6 +106,19 @@ interface AppDao {
     @Query("SELECT * FROM clients")
     fun getAllClients(): Flow<List<ClientDataEntity>>
 
+    // UPDATE QUERIES
+    @Query("UPDATE clients SET name = :newName")
+    suspend fun updateClientName(newName: String)
+
+    @Query("UPDATE clients SET email = :newEmail")
+    suspend fun updateClientEmail(newEmail: String)
+
+    @Query("UPDATE clients SET payRate = :newRate")
+    suspend fun updateClientHourlyRate(newRate: Double)
+
+    @Query("UPDATE clients SET currency = :newCurrency")
+    suspend fun updateClientCurrency(newCurrency: String)
+
     @Database(entities = [
         ClientDataEntity::class,
         ProjectDataEntity::class,
@@ -112,7 +127,7 @@ interface AppDao {
         InvoiceEntity::class,
         SettingsEntity::class
                          ],
-        version = 2
+        version = 3
     )
     abstract class AppDatabase : RoomDatabase() {
         abstract fun appDao(): AppDao

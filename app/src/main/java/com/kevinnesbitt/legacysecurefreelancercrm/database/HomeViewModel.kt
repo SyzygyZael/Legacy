@@ -29,7 +29,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 id = client.id,
                 name = client.name,
                 email = client.email,
-                hourlyRate = client.hourlyRate,
+                payRate = client.payRate,
                 currency = client.currency,
                 projects = projects
                     .filter { it.id == client.id }
@@ -148,7 +148,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun createClient(name: String, email: String, rate: Double, currency: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            dao.insertClient(ClientDataEntity(id = 0, name = name, email = email, hourlyRate = rate, currency = currency))
+            dao.insertClient(ClientDataEntity(id = 0, name = name, email = email, payRate = rate, currency = currency))
         }
     }
 
@@ -244,7 +244,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val id: Int,
         val name: String,
         val email: String,
-        val hourlyRate: Double,
+        val payRate: Double,
         val currency: String,
         val projects: List<ProjectData>
     )

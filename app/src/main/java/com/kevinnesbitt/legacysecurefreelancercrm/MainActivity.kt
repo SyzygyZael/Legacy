@@ -10,6 +10,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -44,6 +45,9 @@ import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CardElevation
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonColors
@@ -51,9 +55,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -74,6 +80,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewScreenSizes
@@ -90,6 +97,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.sqlite.throwSQLiteException
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
 import com.kevinnesbitt.legacysecurefreelancercrm.ui.theme.LegacySecureFreelancerCRMTheme
+import com.kevinnesbitt.legacysecurefreelancercrm.variables.SupportedCurrency
 import java.nio.file.WatchEvent
 
 class MainActivity : ComponentActivity() {
@@ -606,7 +614,23 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
         mutableStateOf("")
     }
 
+    var tempEmailText by remember {
+        mutableStateOf("")
+    }
+
+    var tempHourlyRate by remember {
+        mutableStateOf("")
+    }
+
+    var tempCurrency by remember {
+        mutableStateOf("")
+    }
+
     var isAddingClient by remember {
+        mutableStateOf(false)
+    }
+
+    var expandCurrencyChoice by remember {
         mutableStateOf(false)
     }
 
@@ -712,7 +736,9 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
         }
     }
 
-    // DIALOG BOXES
+//=======================================
+// DIALOG BOXES
+//=======================================
 
     // Client adding
     if (isAddingClient) {
@@ -721,7 +747,7 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
         ) {
             Surface(
                 color = Color.White,
-                modifier = Modifier.size(350.dp, 200.dp),
+                modifier = Modifier.size(350.dp, 400.dp),
                 shape = RoundedCornerShape(25.dp),
                 border = BorderStroke(2.dp, Color.Gray)
             ) {
@@ -729,20 +755,25 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(4.dp),
-                    verticalArrangement = Arrangement.SpaceEvenly
+
                 ) {
                     Text(
-                        text = "Rename",
+                        text = "New Client",
                         textAlign = TextAlign.Center,
                         fontSize = 21.sp,
                         modifier = Modifier.fillMaxWidth(),
                         fontWeight = FontWeight.Bold
                     )
 
-                    val focusRequester = remember { FocusRequester() }
-
+                    Text(
+                        text = "  Name",
+                        textAlign = TextAlign.Left,
+                        fontSize = 15.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        fontWeight = FontWeight.Bold
+                    )
                     TextField(
-                        value = "",
+                        value = tempNameText,
                         onValueChange = { text ->
                             tempNameText = text
                         },
@@ -751,15 +782,109 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .focusRequester(focusRequester)
                             .padding(5.dp),
                         textStyle = TextStyle(fontSize = 20.sp),
-                        singleLine = true,
-                        shape = RoundedCornerShape(20.dp)
+                        singleLine = true
                     )
 
-                    // request keyboard
-                    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+                    HorizontalDivider(color = Color.White)
+
+                    Text(
+                        text = "  Email",
+                        textAlign = TextAlign.Left,
+                        fontSize = 15.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    TextField(
+                        value = tempEmailText,
+                        onValueChange = { text ->
+                            tempEmailText = text
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(5.dp),
+                        textStyle = TextStyle(fontSize = 20.sp),
+                        singleLine = true
+                    )
+
+                    HorizontalDivider(color = Color.White)
+
+                    Row {
+                        Text(
+                            text = "Currency: ",
+                            fontSize = 15.sp
+                        )
+                        Surface(
+                            modifier = Modifier
+                                .size(60.dp, 30.dp)
+                                .background(color = Color.LightGray)
+                                .clickable(
+                                    onClick = {
+                                        expandCurrencyChoice = true
+                                    }
+                                ),
+                            border = BorderStroke(2.dp, Color.Gray)
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = tempCurrency
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = expandCurrencyChoice,
+                                onDismissRequest = { expandCurrencyChoice = false },
+                                modifier = Modifier.size(width = 60.dp, height = 135.dp)
+                            ) {
+                                SupportedCurrency.entries.forEach { currency ->
+                                    DropdownMenuItem(
+                                        text = { Text(text = currency.code) },
+                                        onClick = {
+                                            tempCurrency = currency.code
+                                            expandCurrencyChoice = false
+                                        }
+                                    )
+                                }
+
+                            }
+                        }
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Pay Rate: ",
+                            fontSize = 15.sp
+                        )
+
+                        TextField(
+                            value = tempHourlyRate,
+                            onValueChange = { text ->
+                                val isValidDecimal = text.count { it == '.' } <= 1 &&
+                                        text.all { it.isDigit() || it == '.' }
+                                if (isValidDecimal) {
+                                    tempHourlyRate = text
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Next,
+                                keyboardType = KeyboardType.Number
+                            ),
+                            modifier = Modifier
+                                .size(50.dp, 35.dp),
+                            textStyle = TextStyle(fontSize = 13.sp),
+                            singleLine = true
+                        )
+                    }
 
                     Row(
                         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -781,15 +906,18 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
 
                         Button(
                             onClick = {
-                                if (newName.isNotBlank()) {
-                                    viewModel.updateListName(
-                                        listId = tempGroceryListId,
-                                        newName = newName
+                                if (tempNameText.isNotBlank()) {
+                                    viewModel.createClient(
+                                        name = tempNameText,
+                                        email = tempEmailText,
+                                        currency = tempCurrency,
+                                        rate = tempHourlyRate.toDouble()
                                     )
-                                    newName = ""
-                                    lstName = ""
-                                    tempGroceryListId = 0
-                                    isChangingListName = false
+                                    tempNameText = ""
+                                    tempEmailText = ""
+                                    tempCurrency = ""
+                                    tempHourlyRate = "0.0"
+                                    isAddingClient = false
                                 }
                             },
                             colors = ButtonColors(
