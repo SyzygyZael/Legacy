@@ -12,6 +12,7 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Update
+import com.kevinnesbitt.legacysecurefreelancercrm.variables.ClientStatus
 import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.internal.synchronized
@@ -21,8 +22,9 @@ data class ClientDataEntity(
     @PrimaryKey(autoGenerate = true) val id: Int,
     val name: String,
     val email: String,
-    val payRate: Double,
-    val currency: String
+    val telp: String,
+    val currency: String,
+    val status: String = ClientStatus.ACTIVE.name
 )
 
 @Entity(tableName = "projects")
@@ -32,6 +34,7 @@ data class ProjectDataEntity(
     val title: String,
     val status: Int,
     val deadLine: Long,
+    val payRate: Double,
     val billingType: String,
     val budget: Double
 )
@@ -107,17 +110,20 @@ interface AppDao {
     fun getAllClients(): Flow<List<ClientDataEntity>>
 
     // UPDATE QUERIES
-    @Query("UPDATE clients SET name = :newName")
-    suspend fun updateClientName(newName: String)
+    @Query("UPDATE clients SET name = :newName WHERE id = :clientId")
+    suspend fun updateClientName(newName: String, clientId: Int)
 
-    @Query("UPDATE clients SET email = :newEmail")
-    suspend fun updateClientEmail(newEmail: String)
+    @Query("UPDATE clients SET email = :newEmail WHERE id = :clientId")
+    suspend fun updateClientEmail(newEmail: String, clientId: Int)
 
-    @Query("UPDATE clients SET payRate = :newRate")
-    suspend fun updateClientHourlyRate(newRate: Double)
+    @Query("UPDATE clients SET telp = :newTelp WHERE id = :clientId")
+    suspend fun updateClientHourlyRate(newTelp: String, clientId: Int)
 
-    @Query("UPDATE clients SET currency = :newCurrency")
-    suspend fun updateClientCurrency(newCurrency: String)
+    @Query("UPDATE clients SET currency = :newCurrency WHERE id = :clientId")
+    suspend fun updateClientCurrency(newCurrency: String, clientId: Int)
+
+    @Query("UPDATE clients SET status = :status WHERE id = :clientId")
+    suspend fun updateClientStatus(status: String, clientId: Int)
 
     @Database(entities = [
         ClientDataEntity::class,
@@ -127,7 +133,7 @@ interface AppDao {
         InvoiceEntity::class,
         SettingsEntity::class
                          ],
-        version = 3
+        version = 5
     )
     abstract class AppDatabase : RoomDatabase() {
         abstract fun appDao(): AppDao

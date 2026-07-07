@@ -29,8 +29,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 id = client.id,
                 name = client.name,
                 email = client.email,
-                payRate = client.payRate,
+                telp = client.telp,
                 currency = client.currency,
+                status = client.status,
                 projects = projects
                     .filter { it.id == client.id }
                     .map { project ->
@@ -40,6 +41,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                             title = project.title,
                             status = project.status,
                             deadLine = project.deadLine,
+                            payRate = project.payRate,
                             billingType = project.billingType,
                             budget = project.budget,
                             tasks = tasks
@@ -146,13 +148,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     // USER ACTIONS & INTENTS (Database Writes)
     // ==========================================
 
-    fun createClient(name: String, email: String, rate: Double, currency: String) {
+    fun createClient(name: String, email: String, telp: String, currency: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            dao.insertClient(ClientDataEntity(id = 0, name = name, email = email, payRate = rate, currency = currency))
+            dao.insertClient(ClientDataEntity(id = 0, name = name, email = email, telp = telp, currency = currency))
         }
     }
 
-    fun createProject(clientId: Int, title: String, budget: Double, type: String, deadline: Long) {
+    fun createProject(clientId: Int, title: String, budget: Double, type: String, payRate: Double, deadline: Long) {
         viewModelScope.launch(Dispatchers.IO) {
             dao.insertProject(
                 ProjectDataEntity(
@@ -160,6 +162,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     title = title,
                     status = 0, // 0 = Active
                     deadLine = deadline,
+                    payRate = payRate,
                     billingType = type,
                     budget = budget,
                     id = 0
@@ -223,6 +226,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateClientStatus(status: String, clientId: Int) {
+        viewModelScope.launch {
+            dao.updateClientStatus(status, clientId)
+        }
+    }
+
 
     data class DashboardUiState(
         val isLoading: Boolean = true,
@@ -244,8 +253,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val id: Int,
         val name: String,
         val email: String,
-        val payRate: Double,
+        val telp: String,
         val currency: String,
+        val status: String,
         val projects: List<ProjectData>
     )
 
@@ -255,6 +265,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val title: String,
         val status: Int,
         val deadLine: Long,
+        val payRate: Double,
         val billingType: String,
         val budget: Double,
         val tasks: List<TaskData>,
