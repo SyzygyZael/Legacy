@@ -1144,6 +1144,10 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
 fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, navController: NavController, innerPadding: PaddingValues) {
     val clientState = viewModel.clientState.collectAsStateWithLifecycle().value.find { clientId == it.id }
     val clientName = clientState?.name?: ""
+    val clientEmail = clientState?.email?: ""
+    val clientPhoneNum = clientState?.telp?: ""
+    val clientProjects = clientState?.projects?: emptyList()
+    val clientCurrency = clientState?.currency?: ""
 
     val windowInfo = LocalWindowInfo.current
     val screenWidth = windowInfo.containerDpSize.width
@@ -1160,32 +1164,48 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, navController:
             elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
             shape = RectangleShape
         ) {
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(color = Color.White)
                     .padding(8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
             ) {
-                Text(
-                    text = " Client Hub",
-                    fontSize = 25.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.SansSerif,
-                    color = Color.Black
-                )
+                Column(
 
-                Text(
-                    text = clientName,
-                    fontSize = 18.sp,
-                    fontFamily = FontFamily.SansSerif,
-                    color = Color.DarkGray
-                )
+                ) {
+                    Text(
+                        text = clientName,
+                        fontSize = 25.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                    Text(
+                        text = clientEmail,
+                        fontSize = 18.sp,
+                        color = Color.DarkGray
+                    )
+                    Text(
+                        text = clientPhoneNum,
+                        fontSize = 18.sp,
+                        color = Color.DarkGray
+                    )
+                    Text(
+                        text = "Currency: $clientCurrency",
+                        fontSize = 18.sp,
+                        color = Color.DarkGray
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+
+                }
             }
         }
-
-
     }
 }
 
