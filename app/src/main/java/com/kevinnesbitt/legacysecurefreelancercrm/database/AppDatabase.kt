@@ -114,11 +114,20 @@ interface AppDao {
     @Query("UPDATE clients SET name = :newName, email = :newEmail, telp = :newNum, currency = :newCurrency WHERE id = :clientId")
     suspend fun updateClientInfo(clientId: Int, newName: String, newEmail: String, newNum: String, newCurrency: String)
 
+    @Query("UPDATE projects SET title = :newTitle, description = :newDesc, deadline = :newDeadline, payRate = :newPayrate, billingType = :newBT, budget = :newBudget WHERE id = :projectId")
+    suspend fun updateProjectInfo(projectId: Int, newTitle: String, newDesc: String, newDeadline: String, newPayrate: Double, newBT: String, newBudget: Double)
+
     @Query("UPDATE clients SET status = :status WHERE id = :clientId")
     suspend fun updateClientStatus(status: String, clientId: Int)
 
     @Query("UPDATE projects SET status = :status WHERE id = :projectId AND clientId = :clientId")
     suspend fun updateProjectStatus(status: String, projectId: Int, clientId: Int)
+
+    @Query("UPDATE projects SET description = :newDesc WHERE id = :projectId")
+    suspend fun updateProjectDescription(projectId: Int, newDesc: String)
+
+    @Query("UPDATE tasks SET isCompleted = :taskStatus WHERE id = :taskId")
+    suspend fun updateTaskStatus(taskId: Int, taskStatus: Boolean)
 
     @Database(entities = [
         ClientDataEntity::class,

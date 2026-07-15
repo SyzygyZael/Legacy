@@ -29,11 +29,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AllInbox
 import androidx.compose.material.icons.filled.Book
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.CorporateFare
 import androidx.compose.material.icons.filled.CurrencyExchange
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.DateRange
@@ -75,16 +79,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontWeight.Companion.Bold
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -254,6 +262,7 @@ class MainActivity : ComponentActivity() {
 
                             when(hubTab) {
                                 "overview" -> ProjectOverviewScreen(projectName, projectId, clientId, hubTab, viewModel, innerPadding, navController)
+                                "tasks" -> TasksScreen(projectName, projectId, clientId, hubTab, viewModel, innerPadding, navController)
                             }
                         }
 
@@ -1199,10 +1208,6 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
         mutableStateOf("")
     }
 
-    var tempBillingType by remember {
-        mutableStateOf("")
-    }
-
     var expandCurrencyChoice by remember {
         mutableStateOf(false)
     }
@@ -2008,7 +2013,7 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = tempBillingType
+                                    text = tempProjectBillingType
                                 )
                             }
 
@@ -2020,7 +2025,7 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                                 DropdownMenuItem(
                                     text = { Text(text = BillingType.FIXED.name) },
                                     onClick = {
-                                        tempBillingType = BillingType.FIXED.name
+                                        tempProjectBillingType = BillingType.FIXED.name
                                         expandBillingTypeChoice = false
                                     }
                                 )
@@ -2028,7 +2033,7 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                                 DropdownMenuItem(
                                     text = { Text(text = BillingType.HOURLY.name) },
                                     onClick = {
-                                        tempBillingType = BillingType.HOURLY.name
+                                        tempProjectBillingType = BillingType.HOURLY.name
                                         expandBillingTypeChoice = false
                                     }
                                 )
@@ -2036,7 +2041,7 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                                 DropdownMenuItem(
                                     text = { Text(text = BillingType.WEEKLY.name) },
                                     onClick = {
-                                        tempBillingType = BillingType.WEEKLY.name
+                                        tempProjectBillingType = BillingType.WEEKLY.name
                                         expandBillingTypeChoice = false
                                     }
                                 )
@@ -2044,7 +2049,7 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                                 DropdownMenuItem(
                                     text = { Text(text = BillingType.DAILY.name) },
                                     onClick = {
-                                        tempBillingType = BillingType.DAILY.name
+                                        tempProjectBillingType = BillingType.DAILY.name
                                         expandBillingTypeChoice = false
                                     }
                                 )
@@ -2180,6 +2185,56 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
     val screenWidth = windowInfo.containerDpSize.width
     val screenHeight = windowInfo.containerDpSize.height
 
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState()
+    val selectedDate = datePickerState.selectedDateMillis?.let {
+        convertMillisToDate(it)
+    } ?: ""
+
+    var tempProjectTitle by remember {
+        mutableStateOf("")
+    }
+
+    var tempProjectDescription by remember {
+        mutableStateOf("")
+    }
+
+    var localDescription by remember(description) {
+        mutableStateOf(TextFieldValue(text = description))
+    }
+
+    var tempProjectRate by remember {
+        mutableDoubleStateOf(0.0)
+    }
+
+    var tempProjectBudget by remember {
+        mutableDoubleStateOf(0.0)
+    }
+
+    var tempProjectBillingType by remember {
+        mutableStateOf("")
+    }
+
+    var tempProjectDeadline by remember {
+        mutableStateOf("--/--/----")
+    }
+
+    var tempProjectStatus by remember {
+        mutableStateOf("")
+    }
+
+    var expandBillingTypeChoice by remember {
+        mutableStateOf(false)
+    }
+
+    var editProjectInfo by remember {
+        mutableStateOf(false)
+    }
+
+    var editDescription by remember {
+        mutableStateOf(false)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -2206,6 +2261,34 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                     fontFamily = FontFamily.SansSerif,
                     color = Color.Black
                 )
+
+                IconButton(
+                    modifier = Modifier.size(20.dp),
+                    onClick = {
+                        tempProjectTitle = project?.title?: ""
+                        tempProjectDescription = project?.description?: ""
+                        tempProjectDeadline = project?.deadLine?: "--/--/----"
+                        tempProjectBillingType = project?.billingType?: ""
+                        tempProjectRate = project?.payRate?: 0.0
+                        tempProjectBudget = project?.budget?: 0.0
+                        tempProjectStatus = project?.status?: ""
+                        editProjectInfo = true
+                    },
+                    colors = IconButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Black,
+                        disabledContentColor = Color.Black,
+                        disabledContainerColor = Color.White
+                    ),
+                    shape = CircleShape
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit Project Info",
+                        modifier = Modifier.size(20.dp),
+                        tint = Color.Black
+                    )
+                }
             }
 
             Row(
@@ -2216,7 +2299,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Button(
-                    onClick = { navController.navigate("overview") },
+                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/overview") },
                     shape = RectangleShape,
                     colors = ButtonColors(
                         containerColor = Color.White,
@@ -2229,7 +2312,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                 }
 
                 Button(
-                    onClick = {  },
+                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/tasks") },
                     shape = RectangleShape,
                     colors = ButtonColors(
                         containerColor = Color.White,
@@ -2242,7 +2325,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                 }
 
                 Button(
-                    onClick = {  },
+                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/logs") },
                     shape = RectangleShape,
                     colors = ButtonColors(
                         containerColor = Color.White,
@@ -2255,7 +2338,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                 }
 
                 Button(
-                    onClick = {  },
+                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/invoices") },
                     shape = RectangleShape,
                     colors = ButtonColors(
                         containerColor = Color.White,
@@ -2291,11 +2374,50 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                     )
                 }
 
-                Text(
-                    text = description,
-                    fontSize = 17.sp,
-                    color = Color.Black
-                )
+                if (editDescription){
+                    val focusRequester = remember { FocusRequester() }
+                    BasicTextField(
+                        value = localDescription,
+                        onValueChange = { text ->
+                            if (localDescription.text.length <= 500) {
+                                localDescription = text
+                            }
+                        },
+                        textStyle = TextStyle(
+                            fontSize = 17.sp,
+                            color = Color.Black
+                        ),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .focusRequester(focusRequester),
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                viewModel.updateProjectDescription(projectId, localDescription.text)
+                                editDescription = false
+                            }
+                        )
+                    )
+                    // request keyboard
+                    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+                } else {
+                    LazyColumn {
+                        item {
+                            Text(
+                                text = description,
+                                fontSize = 17.sp,
+                                color = Color.Black,
+                                modifier = Modifier.clickable(
+                                    onClick = {
+                                        editDescription = true
+                                    }
+                                )
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -2356,7 +2478,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                     ) {
                         Text(
                             text = "0",
-                            fontSize = 30.sp,
+                            fontSize = 20.sp,
                             fontWeight = Bold,
                             color = Color.Black
                         )
@@ -2405,7 +2527,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                             color = Color(0xFF00FFFFL).copy(alpha = 0.3f)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.CurrencyExchange,
+                                imageVector = Icons.Default.CalendarMonth,
                                 contentDescription = "Deadline",
                                 modifier = Modifier
                                     .size(10.dp)
@@ -2430,7 +2552,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                     ) {
                         Text(
                             text = project?.deadLine?: "--/--/----",
-                            fontSize = 30.sp,
+                            fontSize = 20.sp,
                             fontWeight = Bold,
                             color = Color.Black
                         )
@@ -2486,7 +2608,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                     ) {
                         Text(
                             text = "Task name",
-                            fontSize = 30.sp,
+                            fontSize = 20.sp,
                             fontWeight = Bold,
                             color = Color.Black
                         )
@@ -2542,7 +2664,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                     ) {
                         Text(
                             text = "0",
-                            fontSize = 30.sp,
+                            fontSize = 20.sp,
                             fontWeight = Bold,
                             color = Color.Black
                         )
@@ -2598,7 +2720,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                     ) {
                         Text(
                             text = "${project?.tasks?.size}",
-                            fontSize = 30.sp,
+                            fontSize = 20.sp,
                             fontWeight = Bold,
                             color = Color.Black
                         )
@@ -2629,7 +2751,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                             color = Color(0xFF00FFFFL).copy(alpha = 0.3f)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.DomainVerification,
+                                imageVector = Icons.Default.CorporateFare,
                                 contentDescription = "Rate",
                                 modifier = Modifier
                                     .size(10.dp)
@@ -2654,19 +2776,487 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                     ) {
                         var rateType = ""
                         when(project?.billingType) {
-                            BillingType.HOURLY.name -> rateType = "/hr"
-                            BillingType.FIXED.name -> rateType = ""
-                            BillingType.DAILY.name -> rateType = "/day"
-                            BillingType.WEEKLY.name -> rateType = "/week"
+                            BillingType.HOURLY.name -> { rateType = "/hr" }
+                            BillingType.FIXED.name -> { rateType = " Total" }
+                            BillingType.DAILY.name -> { rateType = "/day" }
+                            BillingType.WEEKLY.name -> { rateType = "/week" }
                         }
 
                         Text(
                             text = "${project?.payRate}${rateType}",
-                            fontSize = 30.sp,
+                            fontSize = 20.sp,
                             fontWeight = Bold,
                             color = Color.Black
                         )
                     }
+                }
+            }
+        }
+    }
+
+    // DIALOG BOXES
+
+    // edit project
+    if (editProjectInfo) {
+        Dialog(
+            onDismissRequest = { editProjectInfo = false }
+        ) {
+            Surface(
+                color = Color.White,
+                modifier = Modifier.size(350.dp, 720.dp),
+                shape = RoundedCornerShape(25.dp),
+                border = BorderStroke(2.dp, Color.Gray)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(4.dp),
+
+                    ) {
+                    Text(
+                        text = "Edit Project",
+                        textAlign = TextAlign.Center,
+                        fontSize = 21.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 7.dp),
+                        fontWeight = Bold
+                    )
+
+                    // Text(
+                    //     text = "  Title",
+                    //     textAlign = TextAlign.Left,
+                    //     fontSize = 15.sp,
+                    //     modifier = Modifier.fillMaxWidth(),
+                    //     fontWeight = Bold
+                    // )
+
+                    OutlinedTextField(
+                        value = tempProjectTitle,
+                        label = { Text(text = "Title") },
+                        onValueChange = { text ->
+                            if (tempProjectTitle.length <= 50) tempProjectTitle = text
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(5.dp),
+                        textStyle = TextStyle(fontSize = 20.sp),
+                        singleLine = true
+                    )
+
+                    HorizontalDivider(color = Color.White)
+
+                    // Text(
+                    //     text = "  Description",
+                    //     textAlign = TextAlign.Left,
+                    //     fontSize = 15.sp,
+                    //     modifier = Modifier.fillMaxWidth(),
+                    //     fontWeight = Bold
+                    // )
+
+                    OutlinedTextField(
+                        value = tempProjectDescription,
+                        label = { Text(text = "Description") },
+                        onValueChange = { text ->
+                            if (tempProjectDescription.length <= 500) tempProjectDescription = text
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(210.dp)
+                            .padding(5.dp),
+                        textStyle = TextStyle(fontSize = 20.sp)
+                    )
+
+                    HorizontalDivider(color = Color.White)
+
+                    // Text(
+                    //     text = "  Deadline: ",
+                    //     fontSize = 15.sp,
+                    //     fontWeight = Bold
+                    // )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp)
+                    ) {
+                        // 1. Create a container specifically to act as the coordinate anchor
+                        Box(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedTextField(
+                                value = selectedDate,
+                                onValueChange = { },
+                                label = { Text("Project Deadline") },
+                                readOnly = true,
+                                trailingIcon = {
+                                    IconButton(onClick = { showDatePicker = !showDatePicker }) {
+                                        Icon(
+                                            imageVector = Icons.Default.DateRange,
+                                            contentDescription = "Select date"
+                                        )
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(5.dp)
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = Color.White)
+
+                    // Text(
+                    //     text = "  Pay Rate",
+                    //     fontSize = 15.sp,
+                    //     fontWeight = Bold
+                    // )
+
+                    OutlinedTextField(
+                        value = if (tempProjectRate == 0.0) "" else tempProjectRate.toString(),
+                        label = { Text(text = "Pay Rate") },
+                        onValueChange = { text ->
+                            val isValidDecimal = text.count { it == '.' } <= 1 &&
+                                    text.all { it.isDigit() || it == '.' }
+                            if (isValidDecimal) {
+                                tempProjectRate = text.toDouble()
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next,
+                            keyboardType = KeyboardType.Number
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(5.dp),
+                        textStyle = TextStyle(fontSize = 20.sp),
+                        singleLine = true
+                    )
+
+                    HorizontalDivider(color = Color.White)
+
+                    // Text(
+                    //     text = "  Budget",
+                    //     fontSize = 15.sp,
+                    //     fontWeight = Bold
+                    // )
+
+                    OutlinedTextField(
+                        value = if (tempProjectBudget == 0.0) "" else tempProjectBudget.toString(),
+                        label = { Text(text = "Budget") },
+                        onValueChange = { text ->
+                            val isValidDecimal = text.count { it == '.' } <= 1 &&
+                                    text.all { it.isDigit() || it == '.' }
+                            if (isValidDecimal) {
+                                tempProjectBudget = text.toDouble()
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next,
+                            keyboardType = KeyboardType.Number
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(5.dp),
+                        textStyle = TextStyle(fontSize = 20.sp),
+                        singleLine = true
+                    )
+
+                    HorizontalDivider(color = Color.White, thickness = 15.dp)
+
+                    Row {
+                        Text(
+                            text = "  Billing Type: ",
+                            fontSize = 15.sp,
+                            fontWeight = Bold
+                        )
+                        Surface(
+                            modifier = Modifier
+                                .size(95.dp, 30.dp)
+                                .background(color = Color.LightGray)
+                                .clickable(
+                                    onClick = {
+                                        expandBillingTypeChoice = true
+                                    }
+                                ),
+                            border = BorderStroke(2.dp, Color.Gray)
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = tempProjectBillingType
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = expandBillingTypeChoice,
+                                onDismissRequest = { expandBillingTypeChoice = false },
+                                modifier = Modifier.size(width = 95.dp, height = 100.dp)
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(text = BillingType.FIXED.name) },
+                                    onClick = {
+                                        tempProjectBillingType = BillingType.FIXED.name
+                                        expandBillingTypeChoice = false
+                                    }
+                                )
+
+                                DropdownMenuItem(
+                                    text = { Text(text = BillingType.HOURLY.name) },
+                                    onClick = {
+                                        tempProjectBillingType = BillingType.HOURLY.name
+                                        expandBillingTypeChoice = false
+                                    }
+                                )
+
+                                DropdownMenuItem(
+                                    text = { Text(text = BillingType.WEEKLY.name) },
+                                    onClick = {
+                                        tempProjectBillingType = BillingType.WEEKLY.name
+                                        expandBillingTypeChoice = false
+                                    }
+                                )
+
+                                DropdownMenuItem(
+                                    text = { Text(text = BillingType.DAILY.name) },
+                                    onClick = {
+                                        tempProjectBillingType = BillingType.DAILY.name
+                                        expandBillingTypeChoice = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = Color.White, thickness = 30.dp)
+
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Button(
+                            onClick = {
+                                editProjectInfo = false
+                            },
+                            colors = ButtonColors(
+                                containerColor = Color.DarkGray,
+                                contentColor = Color.White,
+                                disabledContentColor = Color.White,
+                                disabledContainerColor = Color.DarkGray
+                            )
+                        ) {
+                            Text(text = "Cancel")
+                        }
+
+                        Button(
+                            onClick = {
+                                if (tempProjectTitle.isNotBlank()) {
+                                    viewModel.updateProjectInfo(
+                                        projectId = projectId,
+                                        newTitle = tempProjectTitle,
+                                        newDesc = tempProjectDescription,
+                                        newDeadline = tempProjectDeadline,
+                                        newBT = tempProjectBillingType,
+                                        newPayrate = tempProjectRate,
+                                        newBudget = tempProjectBudget,
+                                        newStatus = tempProjectStatus
+                                    )
+                                    tempProjectTitle = ""
+                                    tempProjectDescription = ""
+                                    tempProjectBudget = 0.0
+                                    tempProjectRate = 0.0
+                                    tempProjectDeadline = "--/--/----"
+                                    tempProjectBillingType = ""
+                                    tempProjectStatus = ""
+                                    editProjectInfo = false
+                                }
+                            },
+                            colors = ButtonColors(
+                                containerColor = Color.DarkGray,
+                                contentColor = Color.White,
+                                disabledContentColor = Color.White,
+                                disabledContainerColor = Color.DarkGray
+                            )
+                        ) {
+                            Text(text = "Confirm")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // show date picker
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        tempProjectDeadline = selectedDate
+                        showDatePicker = false
+                    },
+                    // shape = RoundedCornerShape(8.dp),
+                    colors = ButtonColors(
+                        containerColor = Color.Cyan,
+                        contentColor = Color.Black,
+                        disabledContainerColor = Color.Cyan,
+                        disabledContentColor = Color.Black
+                    ),
+                    modifier = Modifier.padding(horizontal = 35.dp)
+                ) {
+                    Text(
+                        text = "Confirm",
+                        fontWeight = Bold,
+                        fontSize = 18.sp,
+                        color = Color.Black
+                    )
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = {
+                        showDatePicker = false
+                    },
+                    // shape = RoundedCornerShape(8.dp),
+                    colors = ButtonColors(
+                        containerColor = Color.LightGray,
+                        contentColor = Color.Black,
+                        disabledContainerColor = Color.LightGray,
+                        disabledContentColor = Color.Black
+                    ),
+                    modifier = Modifier.padding(end = 20.dp)
+                ) {
+                    Text(
+                        text = "Cancel",
+                        fontWeight = Bold,
+                        fontSize = 18.sp,
+                        color = Color.Black
+                    )
+                }
+            }
+        ) {
+            DatePicker(
+                state = datePickerState,
+                showModeToggle = false
+            )
+        }
+    }
+}
+
+@Composable
+fun TasksScreen(projectName: String, projectId: Int, clientId: Int, hubTab: String, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
+    val clientState = viewModel.clientState.collectAsStateWithLifecycle().value.find { clientId == it.id }
+    val project = clientState?.projects?.find { it.id == projectId }
+    val tasks = project?.tasks?: emptyList()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding)
+            .background(color = Color(0xFFF2F2F2L)),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Card(
+            elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
+            shape = RectangleShape
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(color = Color.White)
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "$projectName Tasks",
+                    fontSize = 25.sp,
+                    fontWeight = Bold,
+                    fontFamily = FontFamily.SansSerif,
+                    color = Color.Black
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(color = Color.White),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/overview") },
+                    shape = RectangleShape,
+                    colors = ButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Gray,
+                        disabledContainerColor = Color.White,
+                        disabledContentColor = Color.Gray
+                    )
+                ) {
+                    Text("Overview")
+                }
+
+                Button(
+                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/tasks") },
+                    shape = RectangleShape,
+                    colors = ButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Gray,
+                        disabledContainerColor = Color.White,
+                        disabledContentColor = Color.Gray
+                    )
+                ) {
+                    Text("Tasks")
+                }
+
+                Button(
+                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/logs") },
+                    shape = RectangleShape,
+                    colors = ButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Gray,
+                        disabledContainerColor = Color.White,
+                        disabledContentColor = Color.Gray
+                    )
+                ) {
+                    Text("Time Logs")
+                }
+
+                Button(
+                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/invoices") },
+                    shape = RectangleShape,
+                    colors = ButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Gray,
+                        disabledContainerColor = Color.White,
+                        disabledContentColor = Color.Gray
+                    )
+                ) {
+                    Text("Invoices")
+                }
+            }
+        }
+
+        LazyColumn {
+            items(tasks) { task ->
+                Row(
+                   modifier = Modifier.fillMaxWidth()
+                ) {
+                    Checkbox(
+                        checked = task.isCompleted,
+                        onCheckedChange = {
+
+                        }
+                    )
                 }
             }
         }

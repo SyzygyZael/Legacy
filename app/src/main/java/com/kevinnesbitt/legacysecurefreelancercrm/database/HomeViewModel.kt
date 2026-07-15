@@ -246,6 +246,24 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateProjectInfo(projectId: Int, newTitle: String, newDesc: String, newStatus: String, newDeadline: String, newPayrate: Double, newBT: String, newBudget: Double) {
+        viewModelScope.launch {
+            dao.updateProjectInfo(projectId, newTitle, newDesc, newDeadline, newPayrate, newBT, newBudget)
+        }
+    }
+
+    fun updateProjectDescription(projectId: Int, newDesc: String) {
+        viewModelScope.launch {
+            dao.updateProjectDescription(projectId, newDesc)
+        }
+    }
+
+    fun updateTaskStatus(taskId: Int, taskStatus: Boolean) {
+        viewModelScope.launch {
+            dao.updateTaskStatus(taskId, taskStatus)
+        }
+    }
+
     data class DashboardUiState(
         val isLoading: Boolean = true,
 
