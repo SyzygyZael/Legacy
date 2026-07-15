@@ -1,15 +1,14 @@
 package com.kevinnesbitt.legacysecurefreelancercrm
 
-import android.R
-import android.app.Dialog
 import android.os.Bundle
+import android.widget.Button
+import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,79 +20,77 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.paddingFrom
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.AllInbox
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CurrencyExchange
 import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.DomainVerification
-import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Money
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.StackedLineChart
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardColors
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CardElevation
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonColors
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldColors
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontWeight.Companion.Bold
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.Popup
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -103,12 +100,16 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import androidx.sqlite.throwSQLiteException
+import com.google.android.material.datepicker.MaterialDatePicker
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
 import com.kevinnesbitt.legacysecurefreelancercrm.ui.theme.LegacySecureFreelancerCRMTheme
+import com.kevinnesbitt.legacysecurefreelancercrm.variables.BillingType
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.ClientStatus
+import com.kevinnesbitt.legacysecurefreelancercrm.variables.ProjectStatus
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.SupportedCurrency
-import java.nio.file.WatchEvent
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -233,7 +234,26 @@ class MainActivity : ComponentActivity() {
                             val hubTab = backStackEntry.arguments?.getString("hubTab")?: "overview"
 
                             when(hubTab) {
-                                "overview" -> ClientOverviewScreen(clientId, viewModel, navController, innerPadding)
+                                "overview" -> ClientOverviewScreen(clientId, viewModel, innerPadding, navController)
+                            }
+                        }
+
+                        composable(
+                            route = "project/{projectName}/{projectId}/{clientId}/{hubTab}",
+                            arguments = listOf(
+                                navArgument("projectName") { type = NavType.StringType },
+                                navArgument("clientId") { type = NavType.IntType },
+                                navArgument("projectId") { type = NavType.IntType },
+                                navArgument("hubTab") { type = NavType.StringType },
+                            )
+                        ) { backStackEntry ->
+                            val projectName = backStackEntry.arguments?.getString("projectName")?: ""
+                            val clientId = backStackEntry.arguments?.getInt("clientId")?: 0
+                            val projectId = backStackEntry.arguments?.getInt("projectId")?: 0
+                            val hubTab = backStackEntry.arguments?.getString("hubTab")?: "overview"
+
+                            when(hubTab) {
+                                "overview" -> ProjectOverviewScreen(projectName, projectId, clientId, hubTab, viewModel, innerPadding, navController)
                             }
                         }
 
@@ -284,7 +304,7 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
                 Text(
                     text = " Dashboard",
                     fontSize = 25.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = Bold,
                     fontFamily = FontFamily.SansSerif,
                     color = Color.Black
                 )
@@ -364,7 +384,7 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
                         Text(
                             text = uiState.activeEarningsThisMonth.toString(),
                             fontSize = 30.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = Bold,
                             color = Color.Black
                         )
 
@@ -381,7 +401,7 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
                                     .padding(2.dp),
                                 color = Color(0xFF228B22L),
                                 textAlign = TextAlign.Center,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = Bold,
                                 fontSize = 11.sp
                             )
                         }
@@ -438,7 +458,7 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
                         Text(
                             text = uiState.pendingInvoices.toString(),
                             fontSize = 30.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = Bold,
                             color = Color.Black
                         )
                     }
@@ -494,7 +514,7 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
                         Text(
                             text = "0",
                             fontSize = 30.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = Bold,
                             color = Color.Black
                         )
                     }
@@ -550,7 +570,7 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
                         Text(
                             text = uiState.activeEarningsThisMonth.toString(),
                             fontSize = 30.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = Bold,
                             color = Color.Black
                         )
 
@@ -567,7 +587,7 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
                                     .padding(2.dp),
                                 color = Color(0xFF228B22L),
                                 textAlign = TextAlign.Center,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = Bold,
                                 fontSize = 11.sp
                             )
                         }
@@ -701,7 +721,7 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                 Text(
                     text = if (showArchived) " Archived Clients" else " Clients",
                     fontSize = 25.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = Bold,
                     fontFamily = FontFamily.SansSerif,
                     color = Color.Black
                 )
@@ -787,7 +807,7 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                                 ) {
                                     Text(
                                         text = client.name,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = Bold,
                                         fontSize = 25.sp,
                                         color = Color.Black
                                     )
@@ -809,7 +829,7 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                                         Text(
                                             text = "Archive",
                                             fontSize = 18.sp,
-                                            fontWeight = FontWeight.Bold
+                                            fontWeight = Bold
                                         )
                                     },
                                     onClick = {
@@ -857,7 +877,7 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                                 ) {
                                     Text(
                                         text = client.name,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = Bold,
                                         fontSize = 25.sp,
                                         color = Color.Black
                                     )
@@ -886,7 +906,7 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                                         Text(
                                             text = "Recover",
                                             fontSize = 18.sp,
-                                            fontWeight = FontWeight.Bold
+                                            fontWeight = Bold
                                         )
                                     },
                                     onClick = {
@@ -963,7 +983,7 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 7.dp),
-                        fontWeight = FontWeight.Bold
+                        fontWeight = Bold
                     )
 
                     Text(
@@ -971,7 +991,7 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                         textAlign = TextAlign.Left,
                         fontSize = 15.sp,
                         modifier = Modifier.fillMaxWidth(),
-                        fontWeight = FontWeight.Bold
+                        fontWeight = Bold
                     )
                     OutlinedTextField(
                         value = tempNameText,
@@ -995,7 +1015,7 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                         textAlign = TextAlign.Left,
                         fontSize = 15.sp,
                         modifier = Modifier.fillMaxWidth(),
-                        fontWeight = FontWeight.Bold
+                        fontWeight = Bold
                     )
 
                     OutlinedTextField(
@@ -1018,7 +1038,7 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                     Text(
                         text = "  Phone",
                         fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = Bold
                     )
 
                     OutlinedTextField(
@@ -1047,7 +1067,7 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                         Text(
                             text = "Currency: ",
                             fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = Bold
                         )
                         Surface(
                             modifier = Modifier
@@ -1141,7 +1161,7 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
 }
 
 @Composable
-fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, navController: NavController, innerPadding: PaddingValues) {
+fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
     val clientState = viewModel.clientState.collectAsStateWithLifecycle().value.find { clientId == it.id }
     val clientName = clientState?.name?: ""
     val clientEmail = clientState?.email?: ""
@@ -1152,6 +1172,76 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, navController:
     val windowInfo = LocalWindowInfo.current
     val screenWidth = windowInfo.containerDpSize.width
     val screenHeight = windowInfo.containerDpSize.height
+
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState()
+    val selectedDate = datePickerState.selectedDateMillis?.let {
+        convertMillisToDate(it)
+    } ?: ""
+
+    var showEditClientDialog by remember {
+        mutableStateOf(false)
+    }
+
+    var tempNameText by remember {
+        mutableStateOf("")
+    }
+
+    var tempEmailText by remember {
+        mutableStateOf("")
+    }
+
+    var tempTelpNum by remember {
+        mutableStateOf("")
+    }
+
+    var tempCurrency by remember {
+        mutableStateOf("")
+    }
+
+    var tempBillingType by remember {
+        mutableStateOf("")
+    }
+
+    var expandCurrencyChoice by remember {
+        mutableStateOf(false)
+    }
+
+    var expandBillingTypeChoice by remember {
+        mutableStateOf(false)
+    }
+
+    var isAddingProject by remember {
+        mutableStateOf(false)
+    }
+
+    var tempProjectTitle by remember {
+        mutableStateOf("")
+    }
+
+    var tempProjectDescription by remember {
+        mutableStateOf("")
+    }
+
+    var tempProjectRate by remember {
+        mutableDoubleStateOf(0.0)
+    }
+
+    var tempProjectBudget by remember {
+        mutableDoubleStateOf(0.0)
+    }
+
+    var tempProjectBillingType by remember {
+        mutableStateOf("")
+    }
+
+    var tempProjectDeadline by remember {
+        mutableStateOf("--/--/----")
+    }
+
+    var expandProjectOptions by remember {
+        mutableStateOf(false)
+    }
 
     Column(
         modifier = Modifier
@@ -1164,22 +1254,19 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, navController:
             elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
             shape = RectangleShape
         ) {
-
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(color = Color.White)
                     .padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column(
-
-                ) {
+                Column {
                     Text(
                         text = clientName,
                         fontSize = 25.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = Bold,
                         color = Color.Black
                     )
                     Text(
@@ -1199,10 +1286,1387 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, navController:
                     )
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth()
+                Box(
+                    contentAlignment = Alignment.TopEnd
                 ) {
+                    Surface(
+                        modifier = Modifier.size(45.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Color.Black),
+                        shape = RoundedCornerShape(9.dp)
+                    ) {
+                        IconButton(
+                            modifier = Modifier.fillMaxSize(),
+                            onClick = {
+                                tempNameText = clientName
+                                tempEmailText = clientEmail
+                                tempCurrency = clientCurrency
+                                tempTelpNum = clientPhoneNum
+                                showEditClientDialog = true
+                            },
+                            colors = IconButtonColors(
+                                containerColor = Color.White,
+                                contentColor = Color.Black,
+                                disabledContentColor = Color.Black,
+                                disabledContainerColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(9.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Edit Client",
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .padding(4.dp),
+                                tint = Color.Black
+                            )
+                        }
+                    }
+                }
+            }
 
+            HorizontalDivider(thickness = 15.dp, color = Color.White)
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(color = Color.White)
+                    .padding(6.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val surfaceWidth = (screenWidth / 2) - 12.dp
+                val surfaceHeight = 110.dp
+                val headerTextSize = 16.sp
+                val valueTextSize = 27.sp
+
+                Surface(
+                    modifier = Modifier
+                        .size(surfaceWidth, surfaceHeight)
+                        .padding(end = 2.dp),
+                    border = BorderStroke(2.dp, Color.Black),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Start
+                        ) {
+                            Surface(
+                                modifier = Modifier
+                                    .size(25.dp),
+                                shape = CircleShape,
+                                color = Color(0xFF00FFFFL).copy(alpha = 0.3f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AllInbox,
+                                    contentDescription = "Active Projects",
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .padding(4.dp),
+                                    tint = Color.Blue
+                                )
+                            }
+
+                            Text(
+                                text = "  Active Projects",
+                                color = Color.Gray,
+                                fontSize = headerTextSize
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(80.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "${clientProjects.size}",
+                                fontWeight = Bold,
+                                fontSize = valueTextSize,
+                                color = Color.Black,
+                                modifier = Modifier.padding(5.dp)
+                            )
+                        }
+                    }
+                }
+                Surface(
+                    modifier = Modifier
+                        .size(surfaceWidth, surfaceHeight)
+                        .padding(horizontal = 2.dp),
+                    border = BorderStroke(2.dp, Color.Black),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Start
+                        ) {
+                            Surface(
+                                modifier = Modifier
+                                    .size(25.dp),
+                                shape = CircleShape,
+                                color = Color(0xFF00FFFFL).copy(alpha = 0.3f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Money,
+                                    contentDescription = "Earnings",
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .padding(4.dp),
+                                    tint = Color.Blue
+                                )
+                            }
+
+                            Text(
+                                text = "  Earnings",
+                                color = Color.Gray,
+                                fontSize = headerTextSize
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(80.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "${clientProjects.size}",
+                                fontWeight = Bold,
+                                fontSize = valueTextSize,
+                                color = Color.Black,
+                                modifier = Modifier.padding(5.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(color = Color.White),
+                horizontalArrangement = Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Projects",
+                    fontSize = 25.sp,
+                    fontWeight = Bold,
+                    color = Color.Black,
+                    modifier = Modifier.padding(all = 15.dp)
+                )
+            }
+        }
+
+        if (clientProjects.isNotEmpty()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(clientProjects) { project ->
+                    Card(
+                        elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .padding(8.dp),
+                        colors = CardDefaults.cardColors(Color.White)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(15.dp)
+                                .background(color = Color.White)
+                                .combinedClickable(
+                                    onClick = {
+                                        navController.navigate("project/${project.title}/${project.id}/${clientId}/overview")
+                                    },
+                                    onLongClick = { expandProjectOptions = true }
+                                ),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = project.title,
+                                    fontSize = 23.sp,
+                                    fontWeight = Bold,
+                                    color = Color.Black
+                                )
+
+                                Text(
+                                    text = project.deadLine,
+                                    fontSize = 15.sp,
+                                    color = Color.Gray
+                                )
+                            }
+
+                            var statusColor: Color = Color.White
+                            when(project.status) {
+                                "ARCHIVED" -> statusColor = Color.Red
+                                "PAUSED" -> statusColor = Color.Gray
+                                "ACTIVE" -> statusColor = Color.Green
+                            }
+
+                            Text(
+                                text = project.status,
+                                fontSize = 22.sp,
+                                color = statusColor
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = expandProjectOptions,
+                            onDismissRequest = { expandProjectOptions = false }
+                        ) {
+                            if (project.status != ProjectStatus.ARCHIVED.name) {
+                                DropdownMenuItem(
+                                    text = { Text("Archive") },
+                                    onClick = {
+                                        viewModel.updateProjectStatus(
+                                            ProjectStatus.ARCHIVED.name,
+                                            project.id,
+                                            clientId
+                                        )
+
+                                        expandProjectOptions = false
+                                    }
+                                )
+                            }
+
+                            if (project.status != ProjectStatus.PAUSED.name) {
+                                DropdownMenuItem(
+                                    text = { Text("Pause") },
+                                    onClick = {
+                                        viewModel.updateProjectStatus(
+                                            ProjectStatus.PAUSED.name,
+                                            project.id,
+                                            clientId
+                                        )
+
+                                        expandProjectOptions = false
+                                    }
+                                )
+                            }
+
+                            if (project.status != ProjectStatus.ACTIVE.name) {
+                                DropdownMenuItem(
+                                    text = { Text("Active") },
+                                    onClick = {
+                                        viewModel.updateProjectStatus(
+                                            ProjectStatus.ACTIVE.name,
+                                            project.id,
+                                            clientId
+                                        )
+
+                                        expandProjectOptions = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                modifier = Modifier.size(40.dp),
+                onClick = {
+                    isAddingProject = true
+                },
+                colors = IconButtonColors(
+                    containerColor = Color.Blue,
+                    contentColor = Color.White,
+                    disabledContentColor = Color.White,
+                    disabledContainerColor = Color.Blue
+                ),
+                shape = CircleShape
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Add Client",
+                    modifier = Modifier.size(23.dp),
+                    tint = Color.White
+                )
+            }
+        }
+    }
+
+    // edit client
+    if (showEditClientDialog) {
+        Dialog(
+            onDismissRequest = { showEditClientDialog = false }
+        ) {
+            Surface(
+                color = Color.White,
+                modifier = Modifier.size(350.dp, 450.dp),
+                shape = RoundedCornerShape(25.dp),
+                border = BorderStroke(2.dp, Color.Gray)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(4.dp),
+
+                    ) {
+                    Text(
+                        text = "New Client",
+                        textAlign = TextAlign.Center,
+                        fontSize = 21.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 7.dp),
+                        fontWeight = Bold
+                    )
+
+                    Text(
+                        text = "  Name",
+                        textAlign = TextAlign.Left,
+                        fontSize = 15.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        fontWeight = Bold
+                    )
+                    OutlinedTextField(
+                        value = tempNameText,
+                        onValueChange = { text ->
+                            tempNameText = text
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(5.dp),
+                        textStyle = TextStyle(fontSize = 20.sp),
+                        singleLine = true
+                    )
+
+                    HorizontalDivider(color = Color.White)
+
+                    Text(
+                        text = "  Email",
+                        textAlign = TextAlign.Left,
+                        fontSize = 15.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        fontWeight = Bold
+                    )
+
+                    OutlinedTextField(
+                        value = tempEmailText,
+                        onValueChange = { text ->
+                            tempEmailText = text
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(5.dp),
+                        textStyle = TextStyle(fontSize = 20.sp),
+                        singleLine = true
+                    )
+
+                    HorizontalDivider(color = Color.White)
+
+                    Text(
+                        text = "  Phone",
+                        fontSize = 15.sp,
+                        fontWeight = Bold
+                    )
+
+                    OutlinedTextField(
+                        value = tempTelpNum,
+                        onValueChange = { text ->
+                            val isValidDecimal = text.count { it == '+' } <= 1 &&
+                                    text.all { it.isDigit() || it == '+' }
+                            if (isValidDecimal) {
+                                tempTelpNum = text
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next,
+                            keyboardType = KeyboardType.Number
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(5.dp),
+                        textStyle = TextStyle(fontSize = 20.sp),
+                        singleLine = true
+                    )
+
+                    HorizontalDivider(color = Color.White, thickness = 15.dp)
+
+                    Row {
+                        Text(
+                            text = "Currency: ",
+                            fontSize = 15.sp,
+                            fontWeight = Bold
+                        )
+                        Surface(
+                            modifier = Modifier
+                                .size(60.dp, 30.dp)
+                                .background(color = Color.LightGray)
+                                .clickable(
+                                    onClick = {
+                                        expandCurrencyChoice = true
+                                    }
+                                ),
+                            border = BorderStroke(2.dp, Color.Gray)
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = tempCurrency
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = expandCurrencyChoice,
+                                onDismissRequest = { expandCurrencyChoice = false },
+                                modifier = Modifier.size(width = 60.dp, height = 135.dp)
+                            ) {
+                                SupportedCurrency.entries.forEach { currency ->
+                                    DropdownMenuItem(
+                                        text = { Text(text = currency.code) },
+                                        onClick = {
+                                            tempCurrency = currency.code
+                                            expandCurrencyChoice = false
+                                        }
+                                    )
+                                }
+
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = Color.White, thickness = 30.dp)
+
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Button(
+                            onClick = {
+                                showEditClientDialog = false
+                            },
+                            colors = ButtonColors(
+                                containerColor = Color.DarkGray,
+                                contentColor = Color.White,
+                                disabledContentColor = Color.White,
+                                disabledContainerColor = Color.DarkGray
+                            )
+                        ) {
+                            Text(text = "Cancel")
+                        }
+
+                        Button(
+                            onClick = {
+                                if (tempNameText.isNotBlank()) {
+                                    viewModel.updateClientInfo(
+                                        newName = tempNameText,
+                                        newEmail = tempEmailText,
+                                        newCurrency = tempCurrency,
+                                        newTelp = tempTelpNum,
+                                        clientId = clientId
+                                    )
+                                    tempNameText = ""
+                                    tempEmailText = ""
+                                    tempCurrency = ""
+                                    tempTelpNum = "0.0"
+                                    showEditClientDialog = false
+                                }
+                            },
+                            colors = ButtonColors(
+                                containerColor = Color.DarkGray,
+                                contentColor = Color.White,
+                                disabledContentColor = Color.White,
+                                disabledContainerColor = Color.DarkGray
+                            )
+                        ) {
+                            Text(text = "Confirm")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // add project
+    if (isAddingProject) {
+        Dialog(
+            onDismissRequest = { isAddingProject = false }
+        ) {
+            Surface(
+                color = Color.White,
+                modifier = Modifier.size(350.dp, 720.dp),
+                shape = RoundedCornerShape(25.dp),
+                border = BorderStroke(2.dp, Color.Gray)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(4.dp),
+
+                    ) {
+                    Text(
+                        text = "New Project",
+                        textAlign = TextAlign.Center,
+                        fontSize = 21.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 7.dp),
+                        fontWeight = Bold
+                    )
+
+                    // Text(
+                    //     text = "  Title",
+                    //     textAlign = TextAlign.Left,
+                    //     fontSize = 15.sp,
+                    //     modifier = Modifier.fillMaxWidth(),
+                    //     fontWeight = Bold
+                    // )
+
+                    OutlinedTextField(
+                        value = tempProjectTitle,
+                        label = { Text(text = "Title") },
+                        onValueChange = { text ->
+                            if (tempProjectTitle.length <= 50) tempProjectTitle = text
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(5.dp),
+                        textStyle = TextStyle(fontSize = 20.sp),
+                        singleLine = true
+                    )
+
+                    HorizontalDivider(color = Color.White)
+
+                    // Text(
+                    //     text = "  Description",
+                    //     textAlign = TextAlign.Left,
+                    //     fontSize = 15.sp,
+                    //     modifier = Modifier.fillMaxWidth(),
+                    //     fontWeight = Bold
+                    // )
+
+                    OutlinedTextField(
+                        value = tempProjectDescription,
+                        label = { Text(text = "Description") },
+                        onValueChange = { text ->
+                            if (tempProjectDescription.length <= 500) tempProjectDescription = text
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(210.dp)
+                            .padding(5.dp),
+                        textStyle = TextStyle(fontSize = 20.sp)
+                    )
+
+                    HorizontalDivider(color = Color.White)
+
+                    // Text(
+                    //     text = "  Deadline: ",
+                    //     fontSize = 15.sp,
+                    //     fontWeight = Bold
+                    // )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp)
+                    ) {
+                        // 1. Create a container specifically to act as the coordinate anchor
+                        Box(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedTextField(
+                                value = selectedDate,
+                                onValueChange = { },
+                                label = { Text("Project Deadline") },
+                                readOnly = true,
+                                trailingIcon = {
+                                    IconButton(onClick = { showDatePicker = !showDatePicker }) {
+                                        Icon(
+                                            imageVector = Icons.Default.DateRange,
+                                            contentDescription = "Select date"
+                                        )
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(5.dp)
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = Color.White)
+
+                    // Text(
+                    //     text = "  Pay Rate",
+                    //     fontSize = 15.sp,
+                    //     fontWeight = Bold
+                    // )
+
+                    OutlinedTextField(
+                        value = if (tempProjectRate == 0.0) "" else tempProjectRate.toString(),
+                        label = { Text(text = "Pay Rate") },
+                        onValueChange = { text ->
+                            val isValidDecimal = text.count { it == '.' } <= 1 &&
+                                    text.all { it.isDigit() || it == '.' }
+                            if (isValidDecimal) {
+                                tempProjectRate = text.toDouble()
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next,
+                            keyboardType = KeyboardType.Number
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(5.dp),
+                        textStyle = TextStyle(fontSize = 20.sp),
+                        singleLine = true
+                    )
+
+                    HorizontalDivider(color = Color.White)
+
+                    // Text(
+                    //     text = "  Budget",
+                    //     fontSize = 15.sp,
+                    //     fontWeight = Bold
+                    // )
+
+                    OutlinedTextField(
+                        value = if (tempProjectBudget == 0.0) "" else tempProjectBudget.toString(),
+                        label = { Text(text = "Budget") },
+                        onValueChange = { text ->
+                            val isValidDecimal = text.count { it == '.' } <= 1 &&
+                                    text.all { it.isDigit() || it == '.' }
+                            if (isValidDecimal) {
+                                tempProjectBudget = text.toDouble()
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next,
+                            keyboardType = KeyboardType.Number
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(5.dp),
+                        textStyle = TextStyle(fontSize = 20.sp),
+                        singleLine = true
+                    )
+
+                    HorizontalDivider(color = Color.White, thickness = 15.dp)
+
+                    Row {
+                        Text(
+                            text = "  Billing Type: ",
+                            fontSize = 15.sp,
+                            fontWeight = Bold
+                        )
+                        Surface(
+                            modifier = Modifier
+                                .size(95.dp, 30.dp)
+                                .background(color = Color.LightGray)
+                                .clickable(
+                                    onClick = {
+                                        expandBillingTypeChoice = true
+                                    }
+                                ),
+                            border = BorderStroke(2.dp, Color.Gray)
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = tempBillingType
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = expandBillingTypeChoice,
+                                onDismissRequest = { expandBillingTypeChoice = false },
+                                modifier = Modifier.size(width = 95.dp, height = 100.dp)
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(text = BillingType.FIXED.name) },
+                                    onClick = {
+                                        tempBillingType = BillingType.FIXED.name
+                                        expandBillingTypeChoice = false
+                                    }
+                                )
+
+                                DropdownMenuItem(
+                                    text = { Text(text = BillingType.HOURLY.name) },
+                                    onClick = {
+                                        tempBillingType = BillingType.HOURLY.name
+                                        expandBillingTypeChoice = false
+                                    }
+                                )
+
+                                DropdownMenuItem(
+                                    text = { Text(text = BillingType.WEEKLY.name) },
+                                    onClick = {
+                                        tempBillingType = BillingType.WEEKLY.name
+                                        expandBillingTypeChoice = false
+                                    }
+                                )
+
+                                DropdownMenuItem(
+                                    text = { Text(text = BillingType.DAILY.name) },
+                                    onClick = {
+                                        tempBillingType = BillingType.DAILY.name
+                                        expandBillingTypeChoice = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = Color.White, thickness = 30.dp)
+
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Button(
+                            onClick = {
+                                isAddingProject = false
+                            },
+                            colors = ButtonColors(
+                                containerColor = Color.DarkGray,
+                                contentColor = Color.White,
+                                disabledContentColor = Color.White,
+                                disabledContainerColor = Color.DarkGray
+                            )
+                        ) {
+                            Text(text = "Cancel")
+                        }
+
+                        Button(
+                            onClick = {
+                                if (tempProjectTitle.isNotBlank()) {
+                                    viewModel.createProject(
+                                        clientId = clientId,
+                                        title = tempProjectTitle,
+                                        description = tempProjectDescription,
+                                        deadline = tempProjectDeadline,
+                                        type = tempProjectBillingType,
+                                        payRate = tempProjectRate,
+                                        budget = tempProjectBudget
+                                    )
+                                    tempProjectTitle = ""
+                                    tempProjectDescription = ""
+                                    tempProjectBudget = 0.0
+                                    tempProjectRate = 0.0
+                                    tempProjectDeadline = "--/--/----"
+                                    tempProjectBillingType = ""
+                                    isAddingProject = false
+
+                                    android.util.Log.d("Project Added", "Num Projects: ${clientProjects.size}")
+                                }
+                            },
+                            colors = ButtonColors(
+                                containerColor = Color.DarkGray,
+                                contentColor = Color.White,
+                                disabledContentColor = Color.White,
+                                disabledContainerColor = Color.DarkGray
+                            )
+                        ) {
+                            Text(text = "Confirm")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // show date picker
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        tempProjectDeadline = selectedDate
+                        showDatePicker = false
+                    },
+                    // shape = RoundedCornerShape(8.dp),
+                    colors = ButtonColors(
+                        containerColor = Color.Cyan,
+                        contentColor = Color.Black,
+                        disabledContainerColor = Color.Cyan,
+                        disabledContentColor = Color.Black
+                    ),
+                    modifier = Modifier.padding(horizontal = 35.dp)
+                ) {
+                    Text(
+                        text = "Confirm",
+                        fontWeight = Bold,
+                        fontSize = 18.sp,
+                        color = Color.Black
+                    )
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = {
+                        showDatePicker = false
+                    },
+                    // shape = RoundedCornerShape(8.dp),
+                    colors = ButtonColors(
+                        containerColor = Color.LightGray,
+                        contentColor = Color.Black,
+                        disabledContainerColor = Color.LightGray,
+                        disabledContentColor = Color.Black
+                    ),
+                    modifier = Modifier.padding(end = 20.dp)
+                ) {
+                    Text(
+                        text = "Cancel",
+                        fontWeight = Bold,
+                        fontSize = 18.sp,
+                        color = Color.Black
+                    )
+                }
+            }
+        ) {
+            DatePicker(
+                state = datePickerState,
+                showModeToggle = false
+            )
+        }
+    }
+}
+
+@Composable
+fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hubTab: String, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
+    val clientState = viewModel.clientState.collectAsStateWithLifecycle().value.find { clientId == it.id }
+    val project = clientState?.projects?.find { projectId == it.id }
+    var currentTab = hubTab.replaceRange(0, 1, hubTab[0].uppercase())
+
+    val description = project?.description?: ""
+
+    val windowInfo = LocalWindowInfo.current
+    val screenWidth = windowInfo.containerDpSize.width
+    val screenHeight = windowInfo.containerDpSize.height
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding)
+            .background(color = Color(0xFFF2F2F2L)),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Card(
+            elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
+            shape = RectangleShape
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(color = Color.White)
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "$projectName $currentTab",
+                    fontSize = 25.sp,
+                    fontWeight = Bold,
+                    fontFamily = FontFamily.SansSerif,
+                    color = Color.Black
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(color = Color.White),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = { navController.navigate("overview") },
+                    shape = RectangleShape,
+                    colors = ButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Gray,
+                        disabledContainerColor = Color.White,
+                        disabledContentColor = Color.Gray
+                    )
+                ) {
+                    Text("Overview")
+                }
+
+                Button(
+                    onClick = {  },
+                    shape = RectangleShape,
+                    colors = ButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Gray,
+                        disabledContainerColor = Color.White,
+                        disabledContentColor = Color.Gray
+                    )
+                ) {
+                    Text("Tasks")
+                }
+
+                Button(
+                    onClick = {  },
+                    shape = RectangleShape,
+                    colors = ButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Gray,
+                        disabledContainerColor = Color.White,
+                        disabledContentColor = Color.Gray
+                    )
+                ) {
+                    Text("Time Logs")
+                }
+
+                Button(
+                    onClick = {  },
+                    shape = RectangleShape,
+                    colors = ButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Gray,
+                        disabledContainerColor = Color.White,
+                        disabledContentColor = Color.Gray
+                    )
+                ) {
+                    Text("Invoices")
+                }
+            }
+        }
+
+        // Description
+        Card(
+            elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
+            shape = RoundedCornerShape(18.dp),
+            modifier = Modifier.padding(18.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .size(width = screenWidth - 15.dp, height = screenWidth - 200.dp)
+                    .background(color = Color.White)
+                    .padding(8.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = " Description",
+                        fontSize = 18.sp,
+                        color = Color.Gray
+                    )
+                }
+
+                Text(
+                    text = description,
+                    fontSize = 17.sp,
+                    color = Color.Black
+                )
+            }
+        }
+
+        // METRICS
+        FlowRow(
+            modifier = Modifier
+                .padding(vertical = 4.dp, horizontal = 15.dp)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            itemVerticalAlignment = Alignment.CenterVertically
+
+        ) {
+            // Active earnings
+            Card(
+                elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
+                shape = RoundedCornerShape(15.dp),
+                modifier = Modifier.padding(vertical = 8.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .size(width = 185.dp, height = 115.dp)
+                        .background(color = Color.White)
+                        .padding(5.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .size(25.dp),
+                            shape = CircleShape,
+                            color = Color(0xFF00FFFFL).copy(alpha = 0.3f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.StackedLineChart,
+                                contentDescription = "Active Earnings",
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .padding(4.dp),
+                                tint = Color.Blue
+                            )
+                        }
+
+                        Text(
+                            text = " Active Earnings",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "0",
+                            fontSize = 30.sp,
+                            fontWeight = Bold,
+                            color = Color.Black
+                        )
+
+                        Surface(
+                            modifier = Modifier
+                                .size(52.dp, 20.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFF98FF98L).copy(alpha = 0.2f)
+                        ) {
+                            Text(
+                                text = "^ +0.0%",
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .padding(2.dp),
+                                color = Color(0xFF228B22L),
+                                textAlign = TextAlign.Center,
+                                fontWeight = Bold,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Deadline
+            Card(
+                elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
+                shape = RoundedCornerShape(15.dp),
+                modifier = Modifier.padding(vertical = 8.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .size(width = 185.dp, height = 115.dp)
+                        .background(color = Color.White)
+                        .padding(5.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .size(25.dp),
+                            shape = CircleShape,
+                            color = Color(0xFF00FFFFL).copy(alpha = 0.3f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CurrencyExchange,
+                                contentDescription = "Deadline",
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .padding(4.dp),
+                                tint = Color.Blue
+                            )
+                        }
+
+                        Text(
+                            text = " Deadline",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = project?.deadLine?: "--/--/----",
+                            fontSize = 30.sp,
+                            fontWeight = Bold,
+                            color = Color.Black
+                        )
+                    }
+                }
+            }
+
+            // Current Task
+            Card(
+                elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
+                shape = RoundedCornerShape(15.dp),
+                modifier = Modifier.padding(vertical = 8.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .size(width = 185.dp, height = 115.dp)
+                        .background(color = Color.White)
+                        .padding(5.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .size(25.dp),
+                            shape = CircleShape,
+                            color = Color(0xFF00FFFFL).copy(alpha = 0.3f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DomainVerification,
+                                contentDescription = "Current Task",
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .padding(4.dp),
+                                tint = Color.Blue
+                            )
+                        }
+
+                        Text(
+                            text = " Current Task",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Task name",
+                            fontSize = 30.sp,
+                            fontWeight = Bold,
+                            color = Color.Black
+                        )
+                    }
+                }
+            }
+
+            // Pending Invoices
+            Card(
+                elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
+                shape = RoundedCornerShape(15.dp),
+                modifier = Modifier.padding(vertical = 8.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .size(width = 185.dp, height = 115.dp)
+                        .background(color = Color.White)
+                        .padding(5.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .size(25.dp),
+                            shape = CircleShape,
+                            color = Color(0xFF00FFFFL).copy(alpha = 0.3f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CurrencyExchange,
+                                contentDescription = "Pending Invoices",
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .padding(4.dp),
+                                tint = Color.Blue
+                            )
+                        }
+
+                        Text(
+                            text = " Pending Invoices",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "0",
+                            fontSize = 30.sp,
+                            fontWeight = Bold,
+                            color = Color.Black
+                        )
+                    }
+                }
+            }
+
+            // Pending Tasks
+            Card(
+                elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
+                shape = RoundedCornerShape(15.dp),
+                modifier = Modifier.padding(vertical = 8.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .size(width = 185.dp, height = 115.dp)
+                        .background(color = Color.White)
+                        .padding(5.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .size(25.dp),
+                            shape = CircleShape,
+                            color = Color(0xFF00FFFFL).copy(alpha = 0.3f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Book,
+                                contentDescription = "Completed Tasks",
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .padding(4.dp),
+                                tint = Color.Blue
+                            )
+                        }
+
+                        Text(
+                            text = " Completed Tasks",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "${project?.tasks?.size}",
+                            fontSize = 30.sp,
+                            fontWeight = Bold,
+                            color = Color.Black
+                        )
+                    }
+                }
+            }
+
+            // Rate per Billing Type
+            Card(
+                elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
+                shape = RoundedCornerShape(15.dp),
+                modifier = Modifier.padding(vertical = 8.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .size(width = 185.dp, height = 115.dp)
+                        .background(color = Color.White)
+                        .padding(5.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .size(25.dp),
+                            shape = CircleShape,
+                            color = Color(0xFF00FFFFL).copy(alpha = 0.3f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DomainVerification,
+                                contentDescription = "Rate",
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .padding(4.dp),
+                                tint = Color.Blue
+                            )
+                        }
+
+                        Text(
+                            text = " Rate",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        var rateType = ""
+                        when(project?.billingType) {
+                            BillingType.HOURLY.name -> rateType = "/hr"
+                            BillingType.FIXED.name -> rateType = ""
+                            BillingType.DAILY.name -> rateType = "/day"
+                            BillingType.WEEKLY.name -> rateType = "/week"
+                        }
+
+                        Text(
+                            text = "${project?.payRate}${rateType}",
+                            fontSize = 30.sp,
+                            fontWeight = Bold,
+                            color = Color.Black
+                        )
+                    }
                 }
             }
         }
@@ -1233,7 +2697,7 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
                 Text(
                     text = " Settings",
                     fontSize = 25.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = Bold,
                     fontFamily = FontFamily.SansSerif,
                     color = Color.Black
                 )
@@ -1249,4 +2713,9 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
 fun GreetingPreview() {
     LegacySecureFreelancerCRMTheme {
     }
+}
+
+fun convertMillisToDate(millis: Long): String {
+    val formatter = SimpleDateFormat("MM/dd/yyyy", Locale.getDefault())
+    return formatter.format(Date(millis))
 }

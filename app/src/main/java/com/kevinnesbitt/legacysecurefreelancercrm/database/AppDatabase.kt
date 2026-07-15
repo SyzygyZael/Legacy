@@ -1,7 +1,6 @@
 package com.kevinnesbitt.legacysecurefreelancercrm.database
 
 import android.content.Context
-import android.icu.util.Currency
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -11,8 +10,8 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.room.Update
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.ClientStatus
+import com.kevinnesbitt.legacysecurefreelancercrm.variables.ProjectStatus
 import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.internal.synchronized
@@ -32,8 +31,9 @@ data class ProjectDataEntity(
     @PrimaryKey(autoGenerate = true) val id: Int,
     val clientId: Int,
     val title: String,
-    val status: Int,
-    val deadLine: Long,
+    val description: String,
+    val status: String = ProjectStatus.ACTIVE.name,
+    val deadLine: String,
     val payRate: Double,
     val billingType: String,
     val budget: Double
@@ -45,7 +45,7 @@ data class TaskDataEntity(
     val projectId: Int,
     val description: String,
     val isCompleted: Boolean,
-    val dueDate: Long
+    val dueDate: String
 )
 
 @Entity(tableName = "time_logs")
@@ -63,8 +63,8 @@ data class InvoiceEntity(
     val projectId: Int,
     val invoiceNumber: String,
     val amount: Double,
-    val issueDate: Long,
-    val dueDate: Long,
+    val issueDate: String,
+    val dueDate: String,
     val status: String,
     val taxPercentage: Double
 )
@@ -72,7 +72,8 @@ data class InvoiceEntity(
 @Entity(tableName = "settings")
 data class SettingsEntity(
     @PrimaryKey(autoGenerate = true) val id: Int,
-    val backgroundColor: Long = 0xFFFFFFFFL
+    val backgroundColor: Long = 0xFFFFFFFFL,
+    val mainTextColor: Long = 0xFF000000L
 )
 
 @Dao
@@ -110,20 +111,14 @@ interface AppDao {
     fun getAllClients(): Flow<List<ClientDataEntity>>
 
     // UPDATE QUERIES
-    @Query("UPDATE clients SET name = :newName WHERE id = :clientId")
-    suspend fun updateClientName(newName: String, clientId: Int)
-
-    @Query("UPDATE clients SET email = :newEmail WHERE id = :clientId")
-    suspend fun updateClientEmail(newEmail: String, clientId: Int)
-
-    @Query("UPDATE clients SET telp = :newTelp WHERE id = :clientId")
-    suspend fun updateClientHourlyRate(newTelp: String, clientId: Int)
-
-    @Query("UPDATE clients SET currency = :newCurrency WHERE id = :clientId")
-    suspend fun updateClientCurrency(newCurrency: String, clientId: Int)
+    @Query("UPDATE clients SET name = :newName, email = :newEmail, telp = :newNum, currency = :newCurrency WHERE id = :clientId")
+    suspend fun updateClientInfo(clientId: Int, newName: String, newEmail: String, newNum: String, newCurrency: String)
 
     @Query("UPDATE clients SET status = :status WHERE id = :clientId")
     suspend fun updateClientStatus(status: String, clientId: Int)
+
+    @Query("UPDATE projects SET status = :status WHERE id = :projectId AND clientId = :clientId")
+    suspend fun updateProjectStatus(status: String, projectId: Int, clientId: Int)
 
     @Database(entities = [
         ClientDataEntity::class,
@@ -133,7 +128,7 @@ interface AppDao {
         InvoiceEntity::class,
         SettingsEntity::class
                          ],
-        version = 5
+        version = 9
     )
     abstract class AppDatabase : RoomDatabase() {
         abstract fun appDao(): AppDao

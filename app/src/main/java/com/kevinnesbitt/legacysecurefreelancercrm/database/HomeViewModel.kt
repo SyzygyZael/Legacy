@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Calendar
+import java.util.Currency
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -33,12 +34,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 currency = client.currency,
                 status = client.status,
                 projects = projects
-                    .filter { it.id == client.id }
+                    .filter { it.clientId == client.id }
                     .map { project ->
                         ProjectData(
                             id = project.id,
                             clientId = project.clientId,
                             title = project.title,
+                            description = project.description,
                             status = project.status,
                             deadLine = project.deadLine,
                             payRate = project.payRate,
@@ -104,7 +106,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
         // 💵 Metric A: Active Month Earnings (Paid Invoices generated/marked within this month)
         val monthlyEarnings = invoices
-            .filter { it.status.equals("Paid", ignoreCase = true) && it.issueDate >= startOfMonthMs }
+            .filter { it.status.equals("Paid", ignoreCase = true) && it.issueDate >= startOfMonthMs.toString() }
             .sumOf { it.amount }
 
         // 📁 Metric B: Outstanding/Pending Accounts Receivables (Sent but unpaid)
@@ -114,7 +116,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         // 🛑 Filter C: Overdue Invoices lists
         val currentTime = System.currentTimeMillis()
         val overdueList = invoices.filter {
-            it.status.equals("Sent", ignoreCase = true) && it.dueDate < currentTime
+            it.status.equals("Sent", ignoreCase = true) && it.dueDate < currentTime.toString()
         }
 
         // ⏱️ Find any active running timer log (where endTime is not logged yet)
@@ -154,13 +156,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun createProject(clientId: Int, title: String, budget: Double, type: String, payRate: Double, deadline: Long) {
+    fun createProject(clientId: Int, title: String, description: String, budget: Double, type: String, payRate: Double, deadline: String) {
         viewModelScope.launch(Dispatchers.IO) {
             dao.insertProject(
                 ProjectDataEntity(
                     clientId = clientId,
                     title = title,
-                    status = 0, // 0 = Active
+                    description = description,
                     deadLine = deadline,
                     payRate = payRate,
                     billingType = type,
@@ -171,7 +173,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun createTask(projectId: Int, description: String, dueDate: Long) {
+    fun createTask(projectId: Int, description: String, dueDate: String) {
         viewModelScope.launch(Dispatchers.IO) {
             dao.insertTask(
                 TaskDataEntity(
@@ -232,6 +234,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateProjectStatus(status: String, projectId: Int, clientId: Int) {
+        viewModelScope.launch {
+            dao.updateProjectStatus(status, projectId, clientId)
+        }
+    }
+
+    fun updateClientInfo(clientId: Int, newName: String, newEmail: String, newTelp: String, newCurrency: String) {
+        viewModelScope.launch {
+            dao.updateClientInfo(clientId, newName, newEmail, newTelp, newCurrency)
+        }
+    }
 
     data class DashboardUiState(
         val isLoading: Boolean = true,
@@ -263,8 +276,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val id: Int,
         val clientId: Int,
         val title: String,
-        val status: Int,
-        val deadLine: Long,
+        val description: String,
+        val status: String,
+        val deadLine: String,
         val payRate: Double,
         val billingType: String,
         val budget: Double,
@@ -278,7 +292,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val projectId: Int,
         val description: String,
         val isCompleted: Boolean,
-        val dueDate: Long
+        val dueDate: String
     )
 
     data class TimeLogData(
@@ -294,8 +308,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val projectId: Int,
         val invoiceNumber: String,
         val amount: Double,
-        val issueDate: Long,
-        val dueDate: Long,
+        val issueDate: String,
+        val dueDate: String,
         val status: String,
         val taxPercentage: Double
     )
