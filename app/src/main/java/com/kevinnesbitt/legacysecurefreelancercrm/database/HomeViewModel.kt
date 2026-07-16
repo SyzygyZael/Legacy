@@ -1,6 +1,7 @@
 package com.kevinnesbitt.legacysecurefreelancercrm.database
 
 import android.app.Application
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.graphics.Path.Companion.combine
 import androidx.compose.ui.text.style.TextDecoration.Companion.combine
 import androidx.lifecycle.AndroidViewModel
@@ -175,13 +176,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun createTask(projectId: Int, description: String, dueDate: String) {
         viewModelScope.launch(Dispatchers.IO) {
+            val currentTasksCount = dao.getTasksFromProjectId(projectId).size
+
             dao.insertTask(
                 TaskDataEntity(
                     id = 0,
                     projectId = projectId,
                     description = description,
                     isCompleted = false,
-                    dueDate = dueDate
+                    dueDate = dueDate,
+                    orderIndex = currentTasksCount
                 )
             )
         }
@@ -261,6 +265,27 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun updateTaskStatus(taskId: Int, taskStatus: Boolean) {
         viewModelScope.launch {
             dao.updateTaskStatus(taskId, taskStatus)
+        }
+    }
+
+    fun editTaskInfo(taskId: Int, newName: String, newDueDate: String) {
+        viewModelScope.launch {
+            dao.editTaskInfo(taskId, newName, newDueDate)
+        }
+    }
+
+    fun updateTasksOrder(projectId: Int, reorderedTasks: List<TaskData>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            // Map each task to its new position index value and save it to Room
+            reorderedTasks.forEachIndexed { index, task ->
+                dao.updateTaskPosition(task.id, index)
+            }
+        }
+    }
+
+    fun deleteTask(taskId: Int) {
+        viewModelScope.launch {
+            dao.deleteTask(taskId)
         }
     }
 

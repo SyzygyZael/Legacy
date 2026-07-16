@@ -45,7 +45,8 @@ data class TaskDataEntity(
     val projectId: Int,
     val description: String,
     val isCompleted: Boolean,
-    val dueDate: String
+    val dueDate: String,
+    val orderIndex: Int
 )
 
 @Entity(tableName = "time_logs")
@@ -98,7 +99,7 @@ interface AppDao {
     @Query("SELECT * FROM invoices")
     fun getAllInvoices(): Flow<List<InvoiceEntity>>
 
-    @Query("SELECT * FROM tasks")
+    @Query("SELECT * FROM tasks ORDER BY orderIndex ASC")
     fun getAllTasks(): Flow<List<TaskDataEntity>>
 
     @Query("SELECT * FROM time_logs")
@@ -129,6 +130,20 @@ interface AppDao {
     @Query("UPDATE tasks SET isCompleted = :taskStatus WHERE id = :taskId")
     suspend fun updateTaskStatus(taskId: Int, taskStatus: Boolean)
 
+    @Query("UPDATE tasks SET description = :newName, dueDate = :newDueDate WHERE id = :taskId")
+    suspend fun editTaskInfo(taskId: Int, newName: String, newDueDate: String)
+
+    @Query("UPDATE tasks SET orderIndex = :newIndex WHERE id = :taskId")
+    suspend fun updateTaskPosition(taskId: Int, newIndex: Int)
+
+    // DELETE QUERIES
+    @Query("DELETE FROM tasks WHERE id = :taskId")
+    suspend fun deleteTask(taskId: Int)
+
+    //OTHER QUERIES
+    @Query("SELECT * FROM tasks WHERE projectId = :projectId")
+    suspend fun getTasksFromProjectId(projectId: Int): List<TaskDataEntity>
+
     @Database(entities = [
         ClientDataEntity::class,
         ProjectDataEntity::class,
@@ -137,7 +152,7 @@ interface AppDao {
         InvoiceEntity::class,
         SettingsEntity::class
                          ],
-        version = 9
+        version = 10
     )
     abstract class AppDatabase : RoomDatabase() {
         abstract fun appDao(): AppDao
