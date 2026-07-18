@@ -14,7 +14,7 @@ android {
 
     defaultConfig {
         applicationId = "com.kevinnesbitt.legacysecurefreelancercrm"
-        minSdk = 24
+        minSdk = 31
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"

@@ -23,7 +23,8 @@ data class ClientDataEntity(
     val email: String,
     val telp: String,
     val currency: String,
-    val status: String = ClientStatus.ACTIVE.name
+    val status: String = ClientStatus.ACTIVE.name,
+    val orderIndex: Int
 )
 
 @Entity(tableName = "projects")
@@ -32,11 +33,12 @@ data class ProjectDataEntity(
     val clientId: Int,
     val title: String,
     val description: String,
-    val status: String = ProjectStatus.ACTIVE.name,
+    val status: String = ProjectStatus.PAUSED.name,
     val deadLine: String,
     val payRate: Double,
     val billingType: String,
-    val budget: Double
+    val budget: Double,
+    val orderIndex: Int
 )
 
 @Entity(tableName = "tasks")
@@ -53,9 +55,12 @@ data class TaskDataEntity(
 data class TimeLogsEntity(
     @PrimaryKey(autoGenerate = true) val id: Int,
     val projectId: Int,
-    val startTime: Long,
-    val endTime: Long,
-    val isBilled: Boolean
+    val startTime: Long = 0L,
+    val endTime: Long = 0L,
+    val pauseStartTime: Long = 0L,
+    val pauseEndTime: Long = 0L,
+    val totalPauseTime: Long = 0L,
+    val isBilled: Boolean = false
 )
 
 @Entity(tableName = "invoices")
@@ -72,9 +77,11 @@ data class InvoiceEntity(
 
 @Entity(tableName = "settings")
 data class SettingsEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int,
+    @PrimaryKey(autoGenerate = false) val id: Int = 1,
     val backgroundColor: Long = 0xFFFFFFFFL,
-    val mainTextColor: Long = 0xFF000000L
+    val mainTextColor: Long = 0xFF000000L,
+    val isTiming: Boolean = false,
+    val isPaused: Boolean = false
 )
 
 @Dao
@@ -95,6 +102,9 @@ interface AppDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertInvoice(invoice: InvoiceEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSettings(settings: SettingsEntity)
+
     // "GET ALL" QUERIES
     @Query("SELECT * FROM invoices")
     fun getAllInvoices(): Flow<List<InvoiceEntity>>
@@ -105,11 +115,17 @@ interface AppDao {
     @Query("SELECT * FROM time_logs")
     fun getAllTimeLogs(): Flow<List<TimeLogsEntity>>
 
-    @Query("SELECT * FROM projects")
+    @Query("SELECT * FROM projects ORDER BY orderIndex ASC")
     fun getAllProjects(): Flow<List<ProjectDataEntity>>
 
-    @Query("SELECT * FROM clients")
+    @Query("SELECT * FROM clients ORDER BY orderIndex ASC")
     fun getAllClients(): Flow<List<ClientDataEntity>>
+
+    @Query("SELECT * FROM settings WHERE id = 1")
+    fun getSettings(): Flow<SettingsEntity>
+
+    @Query("SELECT * FROM settings WHERE id = 1")
+    suspend fun getSettingsOnce(): SettingsEntity?
 
     // UPDATE QUERIES
     @Query("UPDATE clients SET name = :newName, email = :newEmail, telp = :newNum, currency = :newCurrency WHERE id = :clientId")
@@ -121,11 +137,17 @@ interface AppDao {
     @Query("UPDATE clients SET status = :status WHERE id = :clientId")
     suspend fun updateClientStatus(status: String, clientId: Int)
 
+    @Query("UPDATE clients SET orderIndex = :newIndex WHERE id = :clientId")
+    suspend fun updateClientPosition(clientId: Int, newIndex: Int)
+
     @Query("UPDATE projects SET status = :status WHERE id = :projectId AND clientId = :clientId")
     suspend fun updateProjectStatus(status: String, projectId: Int, clientId: Int)
 
     @Query("UPDATE projects SET description = :newDesc WHERE id = :projectId")
     suspend fun updateProjectDescription(projectId: Int, newDesc: String)
+
+    @Query("UPDATE projects SET orderIndex = :newIndex WHERE id = :projectId")
+    suspend fun updateProjectPosition(projectId: Int, newIndex: Int)
 
     @Query("UPDATE tasks SET isCompleted = :taskStatus WHERE id = :taskId")
     suspend fun updateTaskStatus(taskId: Int, taskStatus: Boolean)
@@ -140,9 +162,37 @@ interface AppDao {
     @Query("DELETE FROM tasks WHERE id = :taskId")
     suspend fun deleteTask(taskId: Int)
 
-    //OTHER QUERIES
+    // OTHER QUERIES
+    @Query("SELECT * FROM projects WHERE clientId = :clientId")
+    suspend fun getProjectFromClientId(clientId: Int): List<ProjectDataEntity>
+
     @Query("SELECT * FROM tasks WHERE projectId = :projectId")
     suspend fun getTasksFromProjectId(projectId: Int): List<TaskDataEntity>
+
+    @Query("SELECT * FROM clients")
+    suspend fun getAllClientsList(): List<ClientDataEntity>
+
+    // TIMER QUERIES
+    @Query("UPDATE settings SET isTiming = :timeState WHERE id = 1")
+    suspend fun updateTimerState(timeState: Boolean)
+
+    @Query("UPDATE settings SET isPaused = :timeState WHERE id = 1")
+    suspend fun updateTimerPausedState(timeState: Boolean)
+
+    @Query("UPDATE time_logs SET startTime = :startTime WHERE id = :timeLogId")
+    suspend fun updateStartTime(timeLogId: Int, startTime: Long)
+
+    @Query("UPDATE time_logs SET endTime = :endTime WHERE id = :timeLogId")
+    suspend fun updateEndTime(timeLogId: Int, endTime: Long)
+
+    @Query("UPDATE time_logs SET pauseStartTime = :startTime WHERE id = :timeLogId")
+    suspend fun updatePauseStartTime(timeLogId: Int, startTime: Long)
+
+    @Query("UPDATE time_logs SET pauseEndTime = :endTime WHERE id = :timeLogId")
+    suspend fun updatePauseEndTime(timeLogId: Int, endTime: Long)
+
+    @Query("UPDATE time_logs SET totalPauseTime = :numOfTime WHERE id = :timeLogId")
+    suspend fun updateTotalPauseTime(timeLogId: Int, numOfTime: Long)
 
     @Database(entities = [
         ClientDataEntity::class,
@@ -152,7 +202,7 @@ interface AppDao {
         InvoiceEntity::class,
         SettingsEntity::class
                          ],
-        version = 10
+        version = 14
     )
     abstract class AppDatabase : RoomDatabase() {
         abstract fun appDao(): AppDao

@@ -47,9 +47,12 @@ import androidx.compose.material.icons.filled.DomainVerification
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Money
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.StackedLineChart
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonColors
@@ -75,6 +78,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -115,16 +119,23 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.google.android.material.datepicker.MaterialDatePicker
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
+import com.kevinnesbitt.legacysecurefreelancercrm.database.SettingsEntity
 import com.kevinnesbitt.legacysecurefreelancercrm.ui.theme.LegacySecureFreelancerCRMTheme
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.BillingType
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.ClientStatus
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.ProjectStatus
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.SupportedCurrency
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.time.delay
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.time.LocalTime
+import java.time.Duration
+import java.time.format.DateTimeFormatter
+import kotlin.time.Duration.Companion.milliseconds
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -285,7 +296,17 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadding: PaddingValues) {
+    val settings by viewModel.settings.collectAsState()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val clientState by viewModel.clientState.collectAsStateWithLifecycle()
+    val activeProject = clientState.find { client ->
+        client.projects.any { project ->
+            project.status == ProjectStatus.ACTIVE.name
+        }
+    }?.projects?.find { it.status == ProjectStatus.ACTIVE.name }
+
+    val startTime by remember { mutableStateOf(LocalTime.of(0, 0)) }
+    val endTime by remember { mutableStateOf(LocalTime.of(0, 0)) }
 
     val windowInfo = LocalWindowInfo.current
     val screenWidth = windowInfo.containerDpSize.width
@@ -297,6 +318,8 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
             Color(0xFF00FFFFL)
         )
     )
+
+    val timerState by remember(settings) { mutableStateOf(settings.isTiming) }
 
     Column(
         modifier = Modifier
@@ -618,11 +641,6 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
             shape = RoundedCornerShape(15.dp),
             modifier = Modifier
                 .padding(vertical = 8.dp, horizontal = 18.dp)
-                .clickable(
-                    onClick = {
-
-                    }
-                )
         ) {
             Column(
                 modifier = Modifier
@@ -630,34 +648,155 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
                     .background(color = Color.White)
                     .padding(5.dp)
             ) {
+                val timeLog: HomeViewModel.TimeLogData? = if (activeProject?.timeLogs?.isNotEmpty() == true) {
+                    activeProject.timeLogs.last()
+                } else {
+                    null
+                }
+
                 Row(
-                    modifier = Modifier.padding(5.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Surface(
-                        modifier = Modifier
-                            .size(25.dp),
-                        shape = CircleShape,
-                        color = Color(0xFF00FFFFL).copy(alpha = 0.3f)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Timer,
-                            contentDescription = "Time Worked",
+                        Surface(
                             modifier = Modifier
-                                .size(10.dp)
-                                .padding(4.dp),
-                            tint = Color.Blue
+                                .size(25.dp),
+                            shape = CircleShape,
+                            color = Color(0xFF00FFFFL).copy(alpha = 0.3f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Timer,
+                                contentDescription = "Time Worked",
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .padding(4.dp),
+                                tint = Color.Blue
+                            )
+                        }
+
+                        Text(
+                            text = " Time Worked",
+                            fontSize = 12.sp,
+                            color = Color.Gray
                         )
                     }
 
-                    Text(
-                        text = " Time Worked",
-                        fontSize = 12.sp,
-                        color = Color.Gray
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (settings.isPaused || !settings.isTiming) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(
+                                    modifier = Modifier.size(55.dp, 55.dp),
+                                    onClick = {
+                                        val currentTime = LocalTime.now()
+                                        val currentTimeLong = currentTime.toNanoOfDay()
+
+                                        if (settings.isPaused) {
+                                            val activeTimeLog = activeProject?.timeLogs?.last()
+                                            val pausedTime =
+                                                currentTimeLong - (activeTimeLog?.pauseStartTime?: 0)
+                                            viewModel.updatePauseStartTime(activeTimeLog?.id?: 0, 0L)
+                                            viewModel.updateTotalEndTime(
+                                                activeTimeLog?.id?: 0,
+                                                pausedTime
+                                            )
+
+                                            viewModel.updateTimerPausedState(false)
+                                        } else {
+                                            viewModel.startTrackingTime(
+                                                activeProject?.id?: 0,
+                                                currentTime.toNanoOfDay()
+                                            )
+                                            viewModel.updateTimerState(true)
+                                        }
+
+                                    },
+                                    colors = IconButtonColors(
+                                        containerColor = Color.White,
+                                        contentColor = Color.Black,
+                                        disabledContentColor = Color.Black,
+                                        disabledContainerColor = Color.White
+                                    ),
+                                    shape = CircleShape
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = "Start Timer",
+                                        modifier = Modifier
+                                            .size(30.dp)
+                                            .padding(4.dp),
+                                        tint = Color.Black
+                                    )
+                                }
+                            }
+                        } else {
+                            IconButton(
+                                modifier = Modifier.size(55.dp, 55.dp),
+                                onClick = {
+                                    val activeTimeLog = activeProject?.timeLogs?.last()
+                                    val currentTime = LocalTime.now().toNanoOfDay()
+
+                                    viewModel.updateTimerPausedState(true)
+                                    viewModel.updatePauseStartTime(activeTimeLog?.id?: 0, currentTime)
+                                },
+                                colors = IconButtonColors(
+                                    containerColor = Color.White,
+                                    contentColor = Color.Black,
+                                    disabledContentColor = Color.Black,
+                                    disabledContainerColor = Color.White
+                                ),
+                                shape = CircleShape
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Pause,
+                                    contentDescription = "Pause Timer",
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .padding(4.dp),
+                                    tint = Color.Black
+                                )
+                            }
+                        }
+
+                        IconButton(
+                            modifier = Modifier.size(55.dp, 55.dp),
+                            onClick = {
+                                val activeTimeLog = activeProject?.timeLogs?.last()
+                                val currentTime = LocalTime.now().toNanoOfDay()
+
+                                viewModel.updateTimerState(false)
+                                viewModel.updateEndTime(activeTimeLog?.id?: 0, currentTime)
+                            },
+                            colors = IconButtonColors(
+                                containerColor = Color.White,
+                                contentColor = Color.Black,
+                                disabledContentColor = Color.Black,
+                                disabledContainerColor = Color.White
+                            ),
+                            shape = CircleShape
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Stop,
+                                contentDescription = "Stop Timer",
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .padding(4.dp),
+                                tint = Color.Black
+                            )
+                        }
+                    }
                 }
 
-
+                TimerText(timeLog, settings)
             }
         }
     }
@@ -667,8 +806,13 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
 fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerPadding: PaddingValues) {
     val clientStates by viewModel.clientState.collectAsStateWithLifecycle()
 
-    var localClientStates by remember {
-        mutableStateOf(emptyList<HomeViewModel.ClientData>())
+    var localClientStates by remember(clientStates) { mutableStateOf(clientStates) }
+
+    val lazyListState = rememberLazyListState()
+    val reorderableState = rememberReorderableLazyListState(lazyListState = lazyListState) { from, to ->
+        localClientStates = localClientStates.toMutableList().apply {
+            add(to.index, removeAt(from.index))
+        }
     }
 
     var tempNameText by remember {
@@ -676,10 +820,6 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
     }
 
     var tempEmailText by remember {
-        mutableStateOf("")
-    }
-
-    var tempHourlyRate by remember {
         mutableStateOf("")
     }
 
@@ -715,6 +855,8 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
         localClientStates = clientStates
     }
 
+    var isReordering by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -742,42 +884,66 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                     color = Color.Black
                 )
 
-                IconButton(
-                    modifier = Modifier.size(55.dp, 55.dp),
-                    onClick = {
-                        expandClientScreenMenu = true
-                    },
-                    colors = IconButtonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Black,
-                        disabledContentColor = Color.Black,
-                        disabledContainerColor = Color.White
-                    ),
-                    shape = CircleShape
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = "Menu",
-                        modifier = Modifier.size(25.dp),
-                        tint = Color.Black
-                    )
-
-                    DropdownMenu(
-                        expanded = expandClientScreenMenu,
-                        onDismissRequest = { expandClientScreenMenu = false },
-                        modifier = Modifier.padding(end = 8.dp)
+                if (isReordering) {
+                    IconButton(
+                        modifier = Modifier.size(55.dp, 55.dp),
+                        onClick = {
+                            isReordering = false
+                            viewModel.updateClientOrder(localClientStates)
+                        },
+                        colors = IconButtonColors(
+                            containerColor = Color.White,
+                            contentColor = Color.Black,
+                            disabledContentColor = Color.Black,
+                            disabledContainerColor = Color.White
+                        ),
+                        shape = CircleShape
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = showArchived,
-                                onCheckedChange = { showArchived = !showArchived }
-                            )
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = "Done Reordering",
+                            modifier = Modifier.size(23.dp),
+                            tint = Color.Black
+                        )
+                    }
+                } else {
+                    IconButton(
+                        modifier = Modifier.size(55.dp, 55.dp),
+                        onClick = {
+                            expandClientScreenMenu = true
+                        },
+                        colors = IconButtonColors(
+                            containerColor = Color.White,
+                            contentColor = Color.Black,
+                            disabledContentColor = Color.Black,
+                            disabledContainerColor = Color.White
+                        ),
+                        shape = CircleShape
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Menu",
+                            modifier = Modifier.size(25.dp),
+                            tint = Color.Black
+                        )
 
-                            Text(
-                                text = "Show Archived"
-                            )
+                        DropdownMenu(
+                            expanded = expandClientScreenMenu,
+                            onDismissRequest = { expandClientScreenMenu = false },
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = showArchived,
+                                    onCheckedChange = { showArchived = !showArchived }
+                                )
+
+                                Text(
+                                    text = "Show Archived"
+                                )
+                            }
                         }
                     }
                 }
@@ -785,155 +951,186 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
         }
 
         LazyColumn(
-            modifier = Modifier.padding(6.dp)
+            modifier = Modifier.padding(6.dp),
+            state = lazyListState
         ) {
             if (localClientStates.isNotEmpty()) {
-                items(localClientStates) { client ->
-                    if ((client.status != ClientStatus.ARCHIVED.name) && !showArchived) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(5.dp)
-                                .combinedClickable(
-                                    onClick = { navController.navigate("client/${client.id}/overview") },
-                                    onLongClick = { expandClientOptions = client.id }
-                                ),
-                            elevation = CardDefaults.cardElevation(
-                                5.dp,
-                                5.dp,
-                                5.dp,
-                                5.dp,
-                                5.dp,
-                                5.dp
-                            ),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = CardDefaults.cardColors(Color.White)
-                        ) {
-                            Row(
+                items(localClientStates, key = { client -> client.id }) { client ->
+                    ReorderableItem(
+                        reorderableState,
+                        key = client.id
+                    ) {
+                        if ((client.status != ClientStatus.ARCHIVED.name) && !showArchived) {
+                            Card(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(6.dp)
-                                    .background(color = Color.White),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                    .fillMaxWidth()
+                                    .padding(5.dp)
+                                    .combinedClickable(
+                                        onClick = { navController.navigate("client/${client.id}/overview") },
+                                        onLongClick = { expandClientOptions = client.id }
+                                    ),
+                                elevation = CardDefaults.cardElevation(
+                                    5.dp,
+                                    5.dp,
+                                    5.dp,
+                                    5.dp,
+                                    5.dp,
+                                    5.dp
+                                ),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = CardDefaults.cardColors(Color.White)
                             ) {
-                                Column(
+                                Row(
                                     modifier = Modifier
-                                        .fillMaxHeight()
+                                        .fillMaxSize()
+                                        .padding(6.dp)
+                                        .background(color = Color.White),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Start
                                 ) {
-                                    Text(
-                                        text = client.name,
-                                        fontWeight = Bold,
-                                        fontSize = 25.sp,
-                                        color = Color.Black
+                                    if (isReordering) {
+                                        Text(
+                                            text = "⋮⋮",
+                                            fontSize = 25.sp,
+                                            color = Color.Black,
+                                            modifier = Modifier
+                                                .padding(10.dp)
+                                                .draggableHandle()
+                                        )
+                                    }
+
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                    ) {
+                                        Text(
+                                            text = client.name,
+                                            fontWeight = Bold,
+                                            fontSize = 25.sp,
+                                            color = Color.Black
+                                        )
+
+                                        Text(
+                                            text = client.email,
+                                            fontSize = 15.sp,
+                                            color = Color.Gray
+                                        )
+                                    }
+                                }
+
+                                DropdownMenu(
+                                    expanded = expandClientOptions == client.id,
+                                    onDismissRequest = { expandClientOptions = null }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = "Archive",
+                                                fontSize = 15.sp,
+                                                fontWeight = Bold
+                                            )
+                                        },
+                                        onClick = {
+                                            viewModel.updateClientStatus(
+                                                ClientStatus.ARCHIVED.name,
+                                                client.id
+                                            )
+
+                                            expandClientOptions = null
+                                        }
                                     )
 
-                                    Text(
-                                        text = client.email,
-                                        fontSize = 15.sp,
-                                        color = Color.Gray
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = "Move",
+                                                fontSize = 15.sp,
+                                                fontWeight = Bold
+                                            )
+                                        },
+                                        onClick = {
+                                            isReordering = true
+                                            expandClientOptions = null
+                                        }
                                     )
                                 }
                             }
-
-                            DropdownMenu(
-                                expanded = expandClientOptions == client.id,
-                                onDismissRequest = { expandClientOptions = null }
-                            ) {
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = "Archive",
-                                            fontSize = 18.sp,
-                                            fontWeight = Bold
-                                        )
-                                    },
-                                    onClick = {
-                                        viewModel.updateClientStatus(
-                                            ClientStatus.ARCHIVED.name,
-                                            client.id
-                                        )
-
-                                        expandClientOptions = null
-                                    }
-                                )
-                            }
-                        }
-                    } else if ((client.status == ClientStatus.ARCHIVED.name) && showArchived) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(5.dp)
-                                .combinedClickable(
-                                    onClick = { navController.navigate("client/${client.id}") },
-                                    onLongClick = { expandClientOptions = client.id }
-                                ),
-                            elevation = CardDefaults.cardElevation(
-                                5.dp,
-                                5.dp,
-                                5.dp,
-                                5.dp,
-                                5.dp,
-                                5.dp
-                            ),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = CardDefaults.cardColors(Color.White)
-                        ) {
-                            Row(
+                        } else if ((client.status == ClientStatus.ARCHIVED.name) && showArchived) {
+                            Card(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(6.dp)
-                                    .background(color = Color.White),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                    .fillMaxWidth()
+                                    .padding(5.dp)
+                                    .combinedClickable(
+                                        onClick = { navController.navigate("client/${client.id}") },
+                                        onLongClick = { expandClientOptions = client.id }
+                                    ),
+                                elevation = CardDefaults.cardElevation(
+                                    5.dp,
+                                    5.dp,
+                                    5.dp,
+                                    5.dp,
+                                    5.dp,
+                                    5.dp
+                                ),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = CardDefaults.cardColors(Color.White)
                             ) {
-                                Column(
+                                Row(
                                     modifier = Modifier
-                                        .fillMaxHeight()
+                                        .fillMaxSize()
+                                        .padding(6.dp)
+                                        .background(color = Color.White),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text(
-                                        text = client.name,
-                                        fontWeight = Bold,
-                                        fontSize = 25.sp,
-                                        color = Color.Black
-                                    )
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                    ) {
+                                        Text(
+                                            text = client.name,
+                                            fontWeight = Bold,
+                                            fontSize = 25.sp,
+                                            color = Color.Black
+                                        )
+
+                                        Text(
+                                            text = client.email,
+                                            fontSize = 15.sp,
+                                            color = Color.Gray
+                                        )
+                                    }
 
                                     Text(
-                                        text = client.email,
-                                        fontSize = 15.sp,
-                                        color = Color.Gray
+                                        text = "ARCHIVED",
+                                        fontSize = 18.sp,
+                                        color = Color(0xFFDF0000L),
+                                        textAlign = TextAlign.Center
                                     )
                                 }
 
-                                Text(
-                                    text = "ARCHIVED",
-                                    fontSize = 18.sp,
-                                    color = Color(0xFFDF0000L),
-                                    textAlign = TextAlign.Center
-                                )
-                            }
+                                DropdownMenu(
+                                    expanded = expandClientOptions == client.id,
+                                    onDismissRequest = { expandClientOptions = null }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = "Recover",
+                                                fontSize = 18.sp,
+                                                fontWeight = Bold
+                                            )
+                                        },
+                                        onClick = {
+                                            viewModel.updateClientStatus(
+                                                ClientStatus.ACTIVE.name,
+                                                client.id
+                                            )
 
-                            DropdownMenu(
-                                expanded = expandClientOptions == client.id,
-                                onDismissRequest = { expandClientOptions = null }
-                            ) {
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = "Recover",
-                                            fontSize = 18.sp,
-                                            fontWeight = Bold
-                                        )
-                                    },
-                                    onClick = {
-                                        viewModel.updateClientStatus(
-                                            ClientStatus.ACTIVE.name,
-                                            client.id
-                                        )
-
-                                        expandClientOptions = null
-                                    }
-                                )
+                                            expandClientOptions = null
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -1188,6 +1385,9 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
     val clientProjects = clientState?.projects?: emptyList()
     val clientCurrency = clientState?.currency?: ""
 
+    // val activeProjectExists = clientProjects.any { it.status == ProjectStatus.ACTIVE.name }
+    val activeProjects = clientProjects.filter { it.status == ProjectStatus.ACTIVE.name }
+
     val windowInfo = LocalWindowInfo.current
     val screenWidth = windowInfo.containerDpSize.width
     val screenHeight = windowInfo.containerDpSize.height
@@ -1198,65 +1398,46 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
         convertMillisToDate(it)
     } ?: ""
 
-    var showEditClientDialog by remember {
-        mutableStateOf(false)
+    var localProjects by remember(clientProjects) { mutableStateOf(clientProjects) }
+
+    val lazyListState = rememberLazyListState()
+    val reorderableState = rememberReorderableLazyListState(lazyListState = lazyListState) { from, to ->
+        localProjects = localProjects.toMutableList().apply {
+            add(to.index, removeAt(from.index))
+        }
     }
 
-    var tempNameText by remember {
-        mutableStateOf("")
-    }
+    var showEditClientDialog by remember { mutableStateOf(false) }
 
-    var tempEmailText by remember {
-        mutableStateOf("")
-    }
+    var tempNameText by remember { mutableStateOf("") }
 
-    var tempTelpNum by remember {
-        mutableStateOf("")
-    }
+    var tempEmailText by remember { mutableStateOf("") }
 
-    var tempCurrency by remember {
-        mutableStateOf("")
-    }
+    var tempTelpNum by remember { mutableStateOf("") }
 
-    var expandCurrencyChoice by remember {
-        mutableStateOf(false)
-    }
+    var tempCurrency by remember { mutableStateOf("") }
 
-    var expandBillingTypeChoice by remember {
-        mutableStateOf(false)
-    }
+    var expandCurrencyChoice by remember { mutableStateOf(false) }
 
-    var isAddingProject by remember {
-        mutableStateOf(false)
-    }
+    var expandBillingTypeChoice by remember { mutableStateOf(false) }
 
-    var tempProjectTitle by remember {
-        mutableStateOf("")
-    }
+    var isAddingProject by remember { mutableStateOf(false) }
 
-    var tempProjectDescription by remember {
-        mutableStateOf("")
-    }
+    var tempProjectTitle by remember { mutableStateOf("") }
 
-    var tempProjectRate by remember {
-        mutableDoubleStateOf(0.0)
-    }
+    var tempProjectDescription by remember { mutableStateOf("") }
 
-    var tempProjectBudget by remember {
-        mutableDoubleStateOf(0.0)
-    }
+    var tempProjectRate by remember { mutableDoubleStateOf(0.0) }
 
-    var tempProjectBillingType by remember {
-        mutableStateOf("")
-    }
+    var tempProjectBudget by remember { mutableDoubleStateOf(0.0) }
 
-    var tempProjectDeadline by remember {
-        mutableStateOf("--/--/----")
-    }
+    var tempProjectBillingType by remember { mutableStateOf("") }
 
-    var expandProjectOptions by remember {
-        mutableStateOf(false)
-    }
+    var tempProjectDeadline by remember { mutableStateOf("--/--/----") }
+
+    var expandProjectOptions by remember { mutableStateOf<Int?>(null) }
+
+    var isReordering by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -1475,7 +1656,7 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(color = Color.White),
-                horizontalArrangement = Arrangement.Start,
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -1485,109 +1666,178 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                     color = Color.Black,
                     modifier = Modifier.padding(all = 15.dp)
                 )
+
+                if (isReordering) {
+                    IconButton(
+                        modifier = Modifier.size(55.dp, 55.dp),
+                        onClick = {
+                            isReordering = false
+                            viewModel.updateProjectOrder(localProjects)
+                        },
+                        colors = IconButtonColors(
+                            containerColor = Color.White,
+                            contentColor = Color.Black,
+                            disabledContentColor = Color.Black,
+                            disabledContainerColor = Color.White
+                        ),
+                        shape = CircleShape
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = "Done Reordering",
+                            modifier = Modifier.size(23.dp),
+                            tint = Color.Black
+                        )
+                    }
+                }
             }
         }
 
-        if (clientProjects.isNotEmpty()) {
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                items(clientProjects) { project ->
-                    Card(
-                        elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier
-                            .padding(8.dp),
-                        colors = CardDefaults.cardColors(Color.White)
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            state = lazyListState
+        ) {
+            items(localProjects, key = { project -> project.id }) { project ->
+                if (localProjects.isNotEmpty()) {
+                    ReorderableItem(
+                        reorderableState,
+                        key = project.id
                     ) {
-                        Row(
+                        Card(
+                            elevation = CardDefaults.cardElevation(
+                                5.dp,
+                                5.dp,
+                                5.dp,
+                                5.dp,
+                                5.dp,
+                                5.dp
+                            ),
+                            shape = RoundedCornerShape(8.dp),
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(15.dp)
-                                .background(color = Color.White)
+                                .padding(8.dp)
                                 .combinedClickable(
                                     onClick = {
                                         navController.navigate("project/${project.title}/${project.id}/${clientId}/overview")
                                     },
-                                    onLongClick = { expandProjectOptions = true }
+                                    onLongClick = { expandProjectOptions = project.id }
                                 ),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            colors = CardDefaults.cardColors(Color.White)
                         ) {
-                            Column {
-                                Text(
-                                    text = project.title,
-                                    fontSize = 23.sp,
-                                    fontWeight = Bold,
-                                    color = Color.Black
-                                )
-
-                                Text(
-                                    text = project.deadLine,
-                                    fontSize = 15.sp,
-                                    color = Color.Gray
-                                )
-                            }
-
-                            var statusColor: Color = Color.White
-                            when(project.status) {
-                                "ARCHIVED" -> statusColor = Color.Red
-                                "PAUSED" -> statusColor = Color.Gray
-                                "ACTIVE" -> statusColor = Color.Green
-                            }
-
-                            Text(
-                                text = project.status,
-                                fontSize = 22.sp,
-                                color = statusColor
-                            )
-                        }
-
-                        DropdownMenu(
-                            expanded = expandProjectOptions,
-                            onDismissRequest = { expandProjectOptions = false }
-                        ) {
-                            if (project.status != ProjectStatus.ARCHIVED.name) {
-                                DropdownMenuItem(
-                                    text = { Text("Archive") },
-                                    onClick = {
-                                        viewModel.updateProjectStatus(
-                                            ProjectStatus.ARCHIVED.name,
-                                            project.id,
-                                            clientId
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(15.dp)
+                                    .background(color = Color.White),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row {
+                                    if (isReordering) {
+                                        Text(
+                                            text = "⋮⋮",
+                                            fontSize = 30.sp,
+                                            color = Color.Black,
+                                            modifier = Modifier
+                                                .padding(10.dp)
+                                                .draggableHandle()
                                         )
-
-                                        expandProjectOptions = false
                                     }
-                                )
-                            }
-
-                            if (project.status != ProjectStatus.PAUSED.name) {
-                                DropdownMenuItem(
-                                    text = { Text("Pause") },
-                                    onClick = {
-                                        viewModel.updateProjectStatus(
-                                            ProjectStatus.PAUSED.name,
-                                            project.id,
-                                            clientId
+                                    Column {
+                                        Text(
+                                            text = project.title,
+                                            fontSize = 23.sp,
+                                            fontWeight = Bold,
+                                            color = Color.Black
                                         )
 
-                                        expandProjectOptions = false
+                                        Text(
+                                            text = project.deadLine,
+                                            fontSize = 15.sp,
+                                            color = Color.Gray
+                                        )
                                     }
+                                }
+
+                                var statusColor: Color = Color.White
+                                when (project.status) {
+                                    "ARCHIVED" -> statusColor = Color.Red
+                                    "PAUSED" -> statusColor = Color.Gray
+                                    "ACTIVE" -> statusColor = Color.Green
+                                }
+
+                                Text(
+                                    text = project.status,
+                                    fontSize = 22.sp,
+                                    color = statusColor
                                 )
                             }
 
-                            if (project.status != ProjectStatus.ACTIVE.name) {
-                                DropdownMenuItem(
-                                    text = { Text("Active") },
-                                    onClick = {
-                                        viewModel.updateProjectStatus(
-                                            ProjectStatus.ACTIVE.name,
-                                            project.id,
-                                            clientId
-                                        )
+                            DropdownMenu(
+                                expanded = expandProjectOptions == project.id,
+                                onDismissRequest = { expandProjectOptions = null }
+                            ) {
+                                if (project.status != ProjectStatus.ARCHIVED.name) {
+                                    DropdownMenuItem(
+                                        text = { Text("Archive") },
+                                        onClick = {
+                                            viewModel.updateProjectStatus(
+                                                ProjectStatus.ARCHIVED.name,
+                                                project.id,
+                                                clientId
+                                            )
 
-                                        expandProjectOptions = false
+                                            expandProjectOptions = null
+                                        }
+                                    )
+                                }
+
+                                if (project.status != ProjectStatus.PAUSED.name) {
+                                    DropdownMenuItem(
+                                        text = { Text("Pause") },
+                                        onClick = {
+                                            viewModel.updateProjectStatus(
+                                                ProjectStatus.PAUSED.name,
+                                                project.id,
+                                                clientId
+                                            )
+
+                                            expandProjectOptions = null
+                                        }
+                                    )
+                                }
+
+                                if (project.status != ProjectStatus.ACTIVE.name) {
+                                    DropdownMenuItem(
+                                        text = { Text("Active") },
+                                        onClick = {
+                                            if (activeProjects.isNotEmpty()) {
+                                                activeProjects.forEach { activeProject ->
+                                                    viewModel.updateProjectStatus(
+                                                        clientId = clientId,
+                                                        projectId = activeProject.id,
+                                                        status = ProjectStatus.PAUSED.name
+                                                    )
+                                                }
+                                            }
+
+                                            viewModel.updateProjectStatus(
+                                                ProjectStatus.ACTIVE.name,
+                                                project.id,
+                                                clientId
+                                            )
+
+                                            expandProjectOptions = null
+                                        }
+                                    )
+                                }
+
+                                DropdownMenuItem(
+                                    text = { Text("Move") },
+                                    onClick = {
+                                        isReordering = true
+                                        expandProjectOptions = null
                                     }
                                 )
                             }
@@ -1595,34 +1845,36 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                     }
                 }
             }
-        }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                modifier = Modifier.size(40.dp),
-                onClick = {
-                    isAddingProject = true
-                },
-                colors = IconButtonColors(
-                    containerColor = Color.Blue,
-                    contentColor = Color.White,
-                    disabledContentColor = Color.White,
-                    disabledContainerColor = Color.Blue
-                ),
-                shape = CircleShape
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add Client",
-                    modifier = Modifier.size(23.dp),
-                    tint = Color.White
-                )
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        modifier = Modifier.size(40.dp),
+                        onClick = {
+                            isAddingProject = true
+                        },
+                        colors = IconButtonColors(
+                            containerColor = Color.Blue,
+                            contentColor = Color.White,
+                            disabledContentColor = Color.White,
+                            disabledContainerColor = Color.Blue
+                        ),
+                        shape = CircleShape
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add Client",
+                            modifier = Modifier.size(23.dp),
+                            tint = Color.White
+                        )
+                    }
+                }
             }
         }
     }
@@ -2190,6 +2442,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
     var currentTab = hubTab.replaceRange(0, 1, hubTab[0].uppercase())
 
     val description = project?.description?: ""
+    val completedTasks = project?.tasks?.filter { it.isCompleted }?.size
 
     val windowInfo = LocalWindowInfo.current
     val screenWidth = windowInfo.containerDpSize.width
@@ -2729,7 +2982,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "${project?.tasks?.size}",
+                            text = "$completedTasks/${project?.tasks?.size}",
                             fontSize = 20.sp,
                             fontWeight = Bold,
                             color = Color.Black
@@ -3224,7 +3477,7 @@ fun TasksScreen(projectName: String, projectId: Int, clientId: Int, hubTab: Stri
                         modifier = Modifier.size(55.dp, 55.dp),
                         onClick = {
                             isReordering = false
-                            viewModel.updateTasksOrder(projectId, localTasks)
+                            viewModel.updateTasksOrder(localTasks)
                         },
                         colors = IconButtonColors(
                             containerColor = Color.White,
@@ -3746,6 +3999,36 @@ fun convertMillisToDate(millis: Long): String {
     return formatter.format(Date(millis))
 }
 
-fun editTask(taskId: Int, taskName: String, taskDeadline: String) {
+@Composable
+fun TimerText(timeLog: HomeViewModel.TimeLogData?, settings: SettingsEntity) {
+    val longStartTime = timeLog?.startTime
 
+    val startTime = LocalTime.ofNanoOfDay(longStartTime ?: 0)
+
+    // 1. ✅ FIX: Turn this into a tracked Compose State, initialized to the current time
+    var timeRightNow by remember { mutableStateOf(LocalTime.now()) }
+
+    // 2. Calculate the duration dynamically based on the living state variable
+    val timerTime = Duration.between(startTime, timeRightNow)
+
+    // 3. Keep your ticking engine running every second
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000.milliseconds)
+            // 4. ✅ FIX: Grab a fresh snapshot of the clock every second to trigger a screen refresh
+            timeRightNow = LocalTime.now()
+        }
+    }
+
+    Text(
+        text = if (settings.isTiming && timeLog != null) {
+            "${timerTime.toHours()}:${String.format("%02d", timerTime.toMinutes() % 60)}:${String.format("%02d", timerTime.seconds % 60)}"
+        } else {
+            "0:00:00"
+        },
+        fontSize = 20.sp,
+        fontWeight = Bold,
+        fontFamily = FontFamily.SansSerif,
+        color = Color.Black
+    )
 }

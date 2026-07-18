@@ -19,6 +19,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dao = AppDao.AppDatabase.getDatabase(application).appDao()
 
+    init {
+        viewModelScope.launch {
+            val existing = dao.getSettingsOnce()
+            if (existing == null) {
+                dao.insertSettings(SettingsEntity())
+            }
+        }
+    }
+
+    val settings = dao.getSettings()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsEntity())
+
     val clientState: StateFlow<List<ClientData>> = combine(
         flow = dao.getAllProjects(),
         flow2 = dao.getAllTasks(),
@@ -153,12 +165,25 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun createClient(name: String, email: String, telp: String, currency: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            dao.insertClient(ClientDataEntity(id = 0, name = name, email = email, telp = telp, currency = currency))
+            val currentClientsCount = dao.getAllClientsList().size
+
+            dao.insertClient(
+                ClientDataEntity(
+                    id = 0,
+                    name = name,
+                    email = email,
+                    telp = telp,
+                    currency = currency,
+                    orderIndex = currentClientsCount
+                )
+            )
         }
     }
 
     fun createProject(clientId: Int, title: String, description: String, budget: Double, type: String, payRate: Double, deadline: String) {
         viewModelScope.launch(Dispatchers.IO) {
+            val currentProjectsCount = dao.getProjectFromClientId(clientId).size
+
             dao.insertProject(
                 ProjectDataEntity(
                     clientId = clientId,
@@ -168,7 +193,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     payRate = payRate,
                     billingType = type,
                     budget = budget,
-                    id = 0
+                    id = 0,
+                    orderIndex = currentProjectsCount
                 )
             )
         }
@@ -201,20 +227,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     // THE STOPWATCH TIMER LOGIC
     // ==========================================
 
-    fun startTrackingTime(projectId: Int) {
+    fun startTrackingTime(projectId: Int, startTime: Long) {
         viewModelScope.launch(Dispatchers.IO) {
-            // Safety guard check: Stop any running tracker first before triggering a new one
-            val active = uiState.value.runningTimer
-            if (active != null) {
-                stopTrackingTime(active)
-            }
             dao.insertTimeLog(
-                TimeLogsEntity(
-                    id = 0,
-                    projectId = projectId,
-                    startTime = System.currentTimeMillis(),
-                    endTime = 0L,
-                    isBilled = false)
+                TimeLogsEntity(id = 0, projectId = projectId, startTime = startTime)
             )
         }
     }
@@ -244,9 +260,27 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateProjectOrder(reorderedTasks: List<ProjectData>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            // Map each task to its new position index value and save it to Room
+            reorderedTasks.forEachIndexed { index, project ->
+                dao.updateProjectPosition(project.id, index)
+            }
+        }
+    }
+
     fun updateClientInfo(clientId: Int, newName: String, newEmail: String, newTelp: String, newCurrency: String) {
         viewModelScope.launch {
             dao.updateClientInfo(clientId, newName, newEmail, newTelp, newCurrency)
+        }
+    }
+
+    fun updateClientOrder(reorderedTasks: List<ClientData>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            // Map each task to its new position index value and save it to Room
+            reorderedTasks.forEachIndexed { index, client ->
+                dao.updateClientPosition(client.id, index)
+            }
         }
     }
 
@@ -274,7 +308,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun updateTasksOrder(projectId: Int, reorderedTasks: List<TaskData>) {
+    fun updateTasksOrder(reorderedTasks: List<TaskData>) {
         viewModelScope.launch(Dispatchers.IO) {
             // Map each task to its new position index value and save it to Room
             reorderedTasks.forEachIndexed { index, task ->
@@ -286,6 +320,48 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteTask(taskId: Int) {
         viewModelScope.launch {
             dao.deleteTask(taskId)
+        }
+    }
+
+    fun updateTimerState(isActive: Boolean) {
+        viewModelScope.launch {
+            dao.updateTimerState(isActive)
+        }
+    }
+
+    fun updateTimerPausedState(isPaused: Boolean) {
+        viewModelScope.launch {
+            dao.updateTimerPausedState(isPaused)
+        }
+    }
+
+    fun updateStartTime(timeLogId: Int, startTime: Long) {
+        viewModelScope.launch {
+            dao.updateStartTime(timeLogId, startTime)
+        }
+    }
+
+    fun updateEndTime(timeLogId: Int, endTime: Long) {
+        viewModelScope.launch {
+            dao.updateEndTime(timeLogId, endTime)
+        }
+    }
+
+    fun updatePauseStartTime(timeLogId: Int, startTime: Long) {
+        viewModelScope.launch {
+            dao.updatePauseStartTime(timeLogId, startTime)
+        }
+    }
+
+    fun updatePauseEndTime(timeLogId: Int, endTime: Long) {
+        viewModelScope.launch {
+            dao.updatePauseEndTime(timeLogId, endTime)
+        }
+    }
+
+    fun updateTotalEndTime(timeLogId: Int, numOfTime: Long) {
+        viewModelScope.launch {
+            dao.updateTotalPauseTime(timeLogId, numOfTime)
         }
     }
 
@@ -343,6 +419,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val projectId: Int,
         val startTime: Long,
         val endTime: Long,
+        val pauseStartTime: Long = 0L,
+        val pauseEndTime: Long = 0L,
+        val totalPauseTime: Long = 0L,
         val isBilled: Boolean
     )
 
