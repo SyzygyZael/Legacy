@@ -1,9 +1,6 @@
 package com.kevinnesbitt.legacysecurefreelancercrm.database
 
 import android.app.Application
-import androidx.compose.runtime.collectAsState
-import androidx.compose.ui.graphics.Path.Companion.combine
-import androidx.compose.ui.text.style.TextDecoration.Companion.combine
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -12,8 +9,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Calendar
-import java.util.Currency
+import java.util.Locale
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -78,7 +77,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                                         projectId = timeLog.id,
                                         startTime = timeLog.startTime,
                                         endTime = timeLog.endTime,
-                                        isBilled = timeLog.isBilled
+                                        isBilled = timeLog.isBilled,
+                                        date = timeLog.date
                                     )
                                 },
                             invoices = invoices
@@ -217,11 +217,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun toggleTaskCompletion(task: TaskDataEntity) {
-        viewModelScope.launch(Dispatchers.IO) {
-            dao.insertTask(task.copy(isCompleted = !task.isCompleted)) // REPLACE strategy updates it
-        }
-    }
+    // fun toggleTaskCompletion(task: TaskDataEntity) {
+    //     viewModelScope.launch(Dispatchers.IO) {
+    //         dao.insertTask(task.copy(isCompleted = !task.isCompleted)) // REPLACE strategy updates it
+    //     }
+    // }
 
     // ==========================================
     // THE STOPWATCH TIMER LOGIC
@@ -229,18 +229,22 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startTrackingTime(projectId: Int, startTime: Long) {
         viewModelScope.launch(Dispatchers.IO) {
+            val date = LocalDate.now()
+            val formatterA = DateTimeFormatter.ofPattern("MM/dd/yyyy", Locale.getDefault())
+            val formattedDateA = date.format(formatterA)
+
             dao.insertTimeLog(
-                TimeLogsEntity(id = 0, projectId = projectId, startTime = startTime)
+                TimeLogsEntity(id = 0, projectId = projectId, startTime = startTime, date = formattedDateA)
             )
         }
     }
 
-    fun stopTrackingTime(activeLog: TimeLogsEntity) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val updatedLog = activeLog.copy(endTime = System.currentTimeMillis())
-            dao.insertTimeLog(updatedLog)
-        }
-    }
+    // fun stopTrackingTime(activeLog: TimeLogsEntity) {
+    //     viewModelScope.launch(Dispatchers.IO) {
+    //         val updatedLog = activeLog.copy(endTime = System.currentTimeMillis())
+    //         dao.insertTimeLog(updatedLog)
+    //     }
+    // }
 
     fun quickMarkInvoicePaid(invoice: InvoiceEntity) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -284,7 +288,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun updateProjectInfo(projectId: Int, newTitle: String, newDesc: String, newStatus: String, newDeadline: String, newPayrate: Double, newBT: String, newBudget: Double) {
+    fun updateProjectInfo(projectId: Int, newTitle: String, newDesc: String, newDeadline: String, newPayrate: Double, newBT: String, newBudget: Double) {
         viewModelScope.launch {
             dao.updateProjectInfo(projectId, newTitle, newDesc, newDeadline, newPayrate, newBT, newBudget)
         }
@@ -329,11 +333,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun updateTimerPausedState(isPaused: Boolean) {
-        viewModelScope.launch {
-            dao.updateTimerPausedState(isPaused)
-        }
-    }
+    // fun updateTimerPausedState(isPaused: Boolean) {
+    //     viewModelScope.launch {
+    //         dao.updateTimerPausedState(isPaused)
+    //     }
+    // }
 
     fun updateStartTime(timeLogId: Int, startTime: Long) {
         viewModelScope.launch {
@@ -347,21 +351,27 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun updatePauseStartTime(timeLogId: Int, startTime: Long) {
-        viewModelScope.launch {
-            dao.updatePauseStartTime(timeLogId, startTime)
-        }
-    }
+    // fun updatePauseStartTime(timeLogId: Int, startTime: Long) {
+    //     viewModelScope.launch {
+    //         dao.updatePauseStartTime(timeLogId, startTime)
+    //     }
+    // }
 
-    fun updatePauseEndTime(timeLogId: Int, endTime: Long) {
-        viewModelScope.launch {
-            dao.updatePauseEndTime(timeLogId, endTime)
-        }
-    }
+    // fun updatePauseEndTime(timeLogId: Int, endTime: Long) {
+    //     viewModelScope.launch {
+    //         dao.updatePauseEndTime(timeLogId, endTime)
+    //     }
+    // }
 
-    fun updateTotalEndTime(timeLogId: Int, numOfTime: Long) {
+    // fun updateTotalPauseTime(timeLogId: Int, numOfTime: Long?) {
+    //     viewModelScope.launch {
+    //         dao.updateTotalPauseTime(timeLogId, numOfTime)
+    //     }
+    // }
+
+    fun updateTimeLogDate(timeLogId: Int, date: String) {
         viewModelScope.launch {
-            dao.updateTotalPauseTime(timeLogId, numOfTime)
+            dao.updateTimeLogDate(timeLogId, date)
         }
     }
 
@@ -419,10 +429,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val projectId: Int,
         val startTime: Long,
         val endTime: Long,
-        val pauseStartTime: Long = 0L,
-        val pauseEndTime: Long = 0L,
-        val totalPauseTime: Long = 0L,
-        val isBilled: Boolean
+        // val pauseStartTime: Long = 0L,
+        // val pauseEndTime: Long = 0L,
+        // val totalPauseTime: Long = 0L,
+        val isBilled: Boolean,
+        val date: String
     )
 
     data class InvoiceData(

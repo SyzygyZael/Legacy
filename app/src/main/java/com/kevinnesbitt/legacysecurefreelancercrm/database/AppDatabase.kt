@@ -57,10 +57,11 @@ data class TimeLogsEntity(
     val projectId: Int,
     val startTime: Long = 0L,
     val endTime: Long = 0L,
-    val pauseStartTime: Long = 0L,
-    val pauseEndTime: Long = 0L,
-    val totalPauseTime: Long = 0L,
-    val isBilled: Boolean = false
+    // val pauseStartTime: Long = 0L,
+    // val pauseEndTime: Long = 0L,
+    // val totalPauseTime: Long = 0L,
+    val isBilled: Boolean = false,
+    val date: String = "--/--/----"
 )
 
 @Entity(tableName = "invoices")
@@ -81,7 +82,7 @@ data class SettingsEntity(
     val backgroundColor: Long = 0xFFFFFFFFL,
     val mainTextColor: Long = 0xFF000000L,
     val isTiming: Boolean = false,
-    val isPaused: Boolean = false
+    // val isPaused: Boolean = false
 )
 
 @Dao
@@ -112,7 +113,7 @@ interface AppDao {
     @Query("SELECT * FROM tasks ORDER BY orderIndex ASC")
     fun getAllTasks(): Flow<List<TaskDataEntity>>
 
-    @Query("SELECT * FROM time_logs")
+    @Query("SELECT * FROM time_logs ORDER BY id DESC")
     fun getAllTimeLogs(): Flow<List<TimeLogsEntity>>
 
     @Query("SELECT * FROM projects ORDER BY orderIndex ASC")
@@ -176,8 +177,8 @@ interface AppDao {
     @Query("UPDATE settings SET isTiming = :timeState WHERE id = 1")
     suspend fun updateTimerState(timeState: Boolean)
 
-    @Query("UPDATE settings SET isPaused = :timeState WHERE id = 1")
-    suspend fun updateTimerPausedState(timeState: Boolean)
+    // @Query("UPDATE settings SET isPaused = :timeState WHERE id = 1")
+    // suspend fun updateTimerPausedState(timeState: Boolean)
 
     @Query("UPDATE time_logs SET startTime = :startTime WHERE id = :timeLogId")
     suspend fun updateStartTime(timeLogId: Int, startTime: Long)
@@ -185,14 +186,17 @@ interface AppDao {
     @Query("UPDATE time_logs SET endTime = :endTime WHERE id = :timeLogId")
     suspend fun updateEndTime(timeLogId: Int, endTime: Long)
 
-    @Query("UPDATE time_logs SET pauseStartTime = :startTime WHERE id = :timeLogId")
-    suspend fun updatePauseStartTime(timeLogId: Int, startTime: Long)
+    // @Query("UPDATE time_logs SET pauseStartTime = :startTime WHERE id = :timeLogId")
+    // suspend fun updatePauseStartTime(timeLogId: Int, startTime: Long)
 
-    @Query("UPDATE time_logs SET pauseEndTime = :endTime WHERE id = :timeLogId")
-    suspend fun updatePauseEndTime(timeLogId: Int, endTime: Long)
+    // @Query("UPDATE time_logs SET pauseEndTime = :endTime WHERE id = :timeLogId")
+    // suspend fun updatePauseEndTime(timeLogId: Int, endTime: Long)
 
-    @Query("UPDATE time_logs SET totalPauseTime = :numOfTime WHERE id = :timeLogId")
-    suspend fun updateTotalPauseTime(timeLogId: Int, numOfTime: Long)
+    // @Query("UPDATE time_logs SET totalPauseTime = :numOfTime WHERE id = :timeLogId")
+    // suspend fun updateTotalPauseTime(timeLogId: Int, numOfTime: Long?)
+
+    @Query("UPDATE time_logs SET date = :date WHERE id = :timeLogId")
+    suspend fun updateTimeLogDate(timeLogId: Int, date: String)
 
     @Database(entities = [
         ClientDataEntity::class,
@@ -202,7 +206,7 @@ interface AppDao {
         InvoiceEntity::class,
         SettingsEntity::class
                          ],
-        version = 14
+        version = 17
     )
     abstract class AppDatabase : RoomDatabase() {
         abstract fun appDao(): AppDao

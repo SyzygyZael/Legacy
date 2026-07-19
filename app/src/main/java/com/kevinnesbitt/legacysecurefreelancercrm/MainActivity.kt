@@ -1,14 +1,11 @@
 package com.kevinnesbitt.legacysecurefreelancercrm
 
 import android.os.Bundle
-import android.widget.Button
-import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,10 +18,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -47,13 +42,13 @@ import androidx.compose.material.icons.filled.DomainVerification
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Money
-import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.StackedLineChart
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
@@ -70,7 +65,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -87,27 +81,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontWeight.Companion.Bold
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.Popup
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -117,7 +108,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.google.android.material.datepicker.MaterialDatePicker
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
 import com.kevinnesbitt.legacysecurefreelancercrm.database.SettingsEntity
 import com.kevinnesbitt.legacysecurefreelancercrm.ui.theme.LegacySecureFreelancerCRMTheme
@@ -126,7 +116,6 @@ import com.kevinnesbitt.legacysecurefreelancercrm.variables.ClientStatus
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.ProjectStatus
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.SupportedCurrency
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.time.delay
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.text.SimpleDateFormat
@@ -242,7 +231,7 @@ class MainActivity : ComponentActivity() {
                         startDestination = "home"
                     ) {
                         composable("home") {
-                            HomeScreen(viewModel, navController, innerPadding)
+                            HomeScreen(viewModel, innerPadding)
                         }
 
                         composable("clients") {
@@ -280,7 +269,9 @@ class MainActivity : ComponentActivity() {
 
                             when(hubTab) {
                                 "overview" -> ProjectOverviewScreen(projectName, projectId, clientId, hubTab, viewModel, innerPadding, navController)
-                                "tasks" -> TasksScreen(projectName, projectId, clientId, hubTab, viewModel, innerPadding, navController)
+                                "tasks" -> TasksScreen(projectName, projectId, clientId, viewModel, innerPadding, navController)
+                                "logs" -> TimeLogsScreen(projectName, projectId, clientId, viewModel, innerPadding, navController)
+                                "invoices" -> InvoiceScreen(projectName, projectId, clientId, viewModel, innerPadding, navController)
                             }
                         }
 
@@ -295,7 +286,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadding: PaddingValues) {
+fun HomeScreen(viewModel: HomeViewModel, innerPadding: PaddingValues) {
     val settings by viewModel.settings.collectAsState()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val clientState by viewModel.clientState.collectAsStateWithLifecycle()
@@ -304,13 +295,15 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
             project.status == ProjectStatus.ACTIVE.name
         }
     }?.projects?.find { it.status == ProjectStatus.ACTIVE.name }
+    val activeProjectClient = clientState.find { it.id == (activeProject?.clientId?: 0) }
 
-    val startTime by remember { mutableStateOf(LocalTime.of(0, 0)) }
-    val endTime by remember { mutableStateOf(LocalTime.of(0, 0)) }
+    val allProjects = clientState.flatMap { client ->
+        client.projects
+    }
 
     val windowInfo = LocalWindowInfo.current
     val screenWidth = windowInfo.containerDpSize.width
-    val screenHeight = windowInfo.containerDpSize.height
+    // val screenHeight = windowInfo.containerDpSize.height
 
     val graphGradient = Brush.linearGradient(
         colors = listOf(
@@ -320,6 +313,8 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
     )
 
     val timerState by remember(settings) { mutableStateOf(settings.isTiming) }
+
+    var showNullActiveProjectDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -504,7 +499,7 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
                 }
             }
 
-            // Active Projects
+            // Projects
             Card(
                 elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
                 shape = RoundedCornerShape(15.dp),
@@ -528,7 +523,7 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Book,
-                                contentDescription = "Active Projects",
+                                contentDescription = "Projects",
                                 modifier = Modifier
                                     .size(10.dp)
                                     .padding(4.dp),
@@ -537,7 +532,7 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
                         }
 
                         Text(
-                            text = " Active Projects",
+                            text = " Projects",
                             fontSize = 12.sp,
                             color = Color.Gray
                         )
@@ -551,7 +546,7 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "0",
+                            text = "${allProjects.size}",
                             fontSize = 30.sp,
                             fontWeight = Bold,
                             color = Color.Black
@@ -646,18 +641,19 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
                 modifier = Modifier
                     .size(width = screenWidth - 15.dp, height = 115.dp)
                     .background(color = Color.White)
-                    .padding(5.dp)
+                    .padding(bottom = 15.dp, start = 8.dp, end = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceEvenly
             ) {
                 val timeLog: HomeViewModel.TimeLogData? = if (activeProject?.timeLogs?.isNotEmpty() == true) {
-                    activeProject.timeLogs.last()
+                    activeProject.timeLogs.first()
                 } else {
                     null
                 }
 
                 Row(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(5.dp),
+                        .fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -690,63 +686,117 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (settings.isPaused || !settings.isTiming) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                IconButton(
-                                    modifier = Modifier.size(55.dp, 55.dp),
-                                    onClick = {
-                                        val currentTime = LocalTime.now()
-                                        val currentTimeLong = currentTime.toNanoOfDay()
+                        // if (settings.isPaused || !settings.isTiming) {
+                        //     Row(
+                        //         verticalAlignment = Alignment.CenterVertically
+                        //     ) {
+                        //         IconButton(
+                        //             modifier = Modifier.size(55.dp, 55.dp),
+                        //             onClick = {
+                        //                 val currentTime = LocalTime.now()
+                        //                 val currentTimeLong = currentTime.toNanoOfDay()
+//
+                        //                 if (settings.isPaused) {
+                        //                     val activeTimeLog = activeProject?.timeLogs?.last()
+                        //                     val pausedTime = currentTimeLong - (activeTimeLog?.pauseStartTime?: 0L)
+//
+                        //                     viewModel.updatePauseStartTime(activeTimeLog?.id?: 0, 0L)
+                        //                     viewModel.updateTotalPauseTime(activeTimeLog?.id?: 0, pausedTime + (activeTimeLog?.totalPauseTime?: 0L))
+//
+                        //                     viewModel.updateTimerPausedState(false)
+                        //                 } else {
+                        //                     viewModel.startTrackingTime(
+                        //                         activeProject?.id?: 0,
+                        //                         currentTime.toNanoOfDay()
+                        //                     )
+//
+                        //                     viewModel.updateTimerState(true)
+                        //                 }
+//
+                        //             },
+                        //             colors = IconButtonColors(
+                        //                 containerColor = Color.White,
+                        //                 contentColor = Color.Black,
+                        //                 disabledContentColor = Color.Black,
+                        //                 disabledContainerColor = Color.White
+                        //             ),
+                        //             shape = CircleShape
+                        //         ) {
+                        //             Icon(
+                        //                 imageVector = Icons.Default.PlayArrow,
+                        //                 contentDescription = "Start Timer",
+                        //                 modifier = Modifier
+                        //                     .size(30.dp)
+                        //                     .padding(4.dp),
+                        //                 tint = Color.Black
+                        //             )
+                        //         }
+                        //     }
+                        // } else {
+                        //     IconButton(
+                        //         modifier = Modifier.size(55.dp, 55.dp),
+                        //         onClick = {
+                        //             val activeTimeLog = activeProject?.timeLogs?.last()
+                        //             val currentTime = LocalTime.now().toNanoOfDay()
+//
+                        //             viewModel.updateTimerPausedState(true)
+                        //             viewModel.updatePauseStartTime(activeTimeLog?.id?: 0, currentTime)
+                        //         },
+                        //         colors = IconButtonColors(
+                        //             containerColor = Color.White,
+                        //             contentColor = Color.Black,
+                        //             disabledContentColor = Color.Black,
+                        //             disabledContainerColor = Color.White
+                        //         ),
+                        //         shape = CircleShape
+                        //     ) {
+                        //         Icon(
+                        //             imageVector = Icons.Default.Pause,
+                        //             contentDescription = "Pause Timer",
+                        //             modifier = Modifier
+                        //                 .size(30.dp)
+                        //                 .padding(4.dp),
+                        //             tint = Color.Black
+                        //         )
+                        //     }
+                        // }
+//
+                        // IconButton(
+                        //     modifier = Modifier.size(55.dp, 55.dp),
+                        //     onClick = {
+                        //         val activeTimeLog = activeProject?.timeLogs?.last()
+                        //         val currentTime = LocalTime.now().toNanoOfDay()
+//
+                        //         viewModel.updateTimerState(false)
+                        //         viewModel.updateEndTime(activeTimeLog?.id?: 0, currentTime)
+                        //     },
+                        //     colors = IconButtonColors(
+                        //         containerColor = Color.White,
+                        //         contentColor = Color.Black,
+                        //         disabledContentColor = Color.Black,
+                        //         disabledContainerColor = Color.White
+                        //     ),
+                        //     shape = CircleShape
+                        // ) {
+                        //     Icon(
+                        //         imageVector = Icons.Default.Stop,
+                        //         contentDescription = "Stop Timer",
+                        //         modifier = Modifier
+                        //             .size(30.dp)
+                        //             .padding(4.dp),
+                        //         tint = Color.Black
+                        //     )
+                        // }
 
-                                        if (settings.isPaused) {
-                                            val activeTimeLog = activeProject?.timeLogs?.last()
-                                            val pausedTime =
-                                                currentTimeLong - (activeTimeLog?.pauseStartTime?: 0)
-                                            viewModel.updatePauseStartTime(activeTimeLog?.id?: 0, 0L)
-                                            viewModel.updateTotalEndTime(
-                                                activeTimeLog?.id?: 0,
-                                                pausedTime
-                                            )
-
-                                            viewModel.updateTimerPausedState(false)
-                                        } else {
-                                            viewModel.startTrackingTime(
-                                                activeProject?.id?: 0,
-                                                currentTime.toNanoOfDay()
-                                            )
-                                            viewModel.updateTimerState(true)
-                                        }
-
-                                    },
-                                    colors = IconButtonColors(
-                                        containerColor = Color.White,
-                                        contentColor = Color.Black,
-                                        disabledContentColor = Color.Black,
-                                        disabledContainerColor = Color.White
-                                    ),
-                                    shape = CircleShape
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.PlayArrow,
-                                        contentDescription = "Start Timer",
-                                        modifier = Modifier
-                                            .size(30.dp)
-                                            .padding(4.dp),
-                                        tint = Color.Black
-                                    )
-                                }
-                            }
-                        } else {
+                        if (timerState) {
                             IconButton(
                                 modifier = Modifier.size(55.dp, 55.dp),
                                 onClick = {
-                                    val activeTimeLog = activeProject?.timeLogs?.last()
+                                    val activeTimeLog = activeProject?.timeLogs?.first()
                                     val currentTime = LocalTime.now().toNanoOfDay()
 
-                                    viewModel.updateTimerPausedState(true)
-                                    viewModel.updatePauseStartTime(activeTimeLog?.id?: 0, currentTime)
+                                    viewModel.updateTimerState(false)
+                                    viewModel.updateEndTime(activeTimeLog?.id?: 0, currentTime)
                                 },
                                 colors = IconButtonColors(
                                     containerColor = Color.White,
@@ -757,8 +807,42 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
                                 shape = CircleShape
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Pause,
-                                    contentDescription = "Pause Timer",
+                                    imageVector = Icons.Default.Stop,
+                                    contentDescription = "Stop Timer",
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .padding(4.dp),
+                                    tint = Color.Black
+                                )
+                            }
+                        } else {
+                            IconButton(
+                                modifier = Modifier.size(55.dp, 55.dp),
+                                onClick = {
+                                    if (activeProject != null) {
+                                        val currentTime = LocalTime.now().toNanoOfDay()
+
+                                        viewModel.startTrackingTime(
+                                            activeProject.id,
+                                            currentTime
+                                        )
+
+                                        viewModel.updateTimerState(true)
+                                    } else {
+                                        showNullActiveProjectDialog = true
+                                    }
+                                },
+                                colors = IconButtonColors(
+                                    containerColor = Color.White,
+                                    contentColor = Color.Black,
+                                    disabledContentColor = Color.Black,
+                                    disabledContainerColor = Color.White
+                                ),
+                                shape = CircleShape
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = "Start Timer",
                                     modifier = Modifier
                                         .size(30.dp)
                                         .padding(4.dp),
@@ -766,37 +850,73 @@ fun HomeScreen(viewModel: HomeViewModel, navController: NavController, innerPadd
                                 )
                             }
                         }
-
-                        IconButton(
-                            modifier = Modifier.size(55.dp, 55.dp),
-                            onClick = {
-                                val activeTimeLog = activeProject?.timeLogs?.last()
-                                val currentTime = LocalTime.now().toNanoOfDay()
-
-                                viewModel.updateTimerState(false)
-                                viewModel.updateEndTime(activeTimeLog?.id?: 0, currentTime)
-                            },
-                            colors = IconButtonColors(
-                                containerColor = Color.White,
-                                contentColor = Color.Black,
-                                disabledContentColor = Color.Black,
-                                disabledContainerColor = Color.White
-                            ),
-                            shape = CircleShape
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Stop,
-                                contentDescription = "Stop Timer",
-                                modifier = Modifier
-                                    .size(30.dp)
-                                    .padding(4.dp),
-                                tint = Color.Black
-                            )
-                        }
                     }
                 }
 
                 TimerText(timeLog, settings)
+
+                Text(
+                    text = "${activeProject?.title?: " No Active Project "}, ${activeProjectClient?.name?: "Unknown Name"}",
+                    color = Color.Gray,
+                    fontSize = 15.sp,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+
+    // DIALOG BOXES
+
+    if (showNullActiveProjectDialog) {
+        Dialog(
+            onDismissRequest = { showNullActiveProjectDialog = false }
+        ) {
+            DialogBoxSkeleton(550.dp, 200.dp) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceAround
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = "No Active Project",
+                        modifier = Modifier
+                            .size(30.dp)
+                            .padding(4.dp),
+                        tint = Color.Gray
+                    )
+
+                    Text(
+                        text = "Warning",
+                        fontSize = 25.sp,
+                        fontWeight = Bold,
+                        color = Color.Black
+                    )
+
+                    Text(
+                        text = "Active project not set",
+                        fontSize = 18.sp,
+                        color = Color.DarkGray
+                    )
+
+                    Button(
+                        onClick = { showNullActiveProjectDialog = false },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Cyan,
+                            contentColor = Color.Black,
+                            disabledContainerColor = Color.Cyan,
+                            disabledContentColor = Color.Black
+                        )
+                    ) {
+                        Text(
+                            text = "Dismiss",
+                            fontWeight = Bold,
+                            fontSize = 15.sp,
+                            color = Color.Black
+                        )
+                    }
+                }
             }
         }
     }
@@ -1385,12 +1505,16 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
     val clientProjects = clientState?.projects?: emptyList()
     val clientCurrency = clientState?.currency?: ""
 
-    // val activeProjectExists = clientProjects.any { it.status == ProjectStatus.ACTIVE.name }
-    val activeProjects = clientProjects.filter { it.status == ProjectStatus.ACTIVE.name }
+    val clients = viewModel.clientState.collectAsStateWithLifecycle().value
+    val activeProjects = clients.flatMap { client ->
+        client.projects.filter { it.status == ProjectStatus.ACTIVE.name }
+    }
+    // android.util.Log.d("Active Projects", "Num Active Projects: ${activeProjects.size}")
+
 
     val windowInfo = LocalWindowInfo.current
     val screenWidth = windowInfo.containerDpSize.width
-    val screenHeight = windowInfo.containerDpSize.height
+    // val screenHeight = windowInfo.containerDpSize.height
 
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
@@ -1813,14 +1937,16 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                                         text = { Text("Active") },
                                         onClick = {
                                             if (activeProjects.isNotEmpty()) {
+                                                // android.util.Log.d("Active Projects", "Num Active Projects: ${activeProjects.size}")
                                                 activeProjects.forEach { activeProject ->
                                                     viewModel.updateProjectStatus(
-                                                        clientId = clientId,
+                                                        clientId = activeProject.clientId,
                                                         projectId = activeProject.id,
                                                         status = ProjectStatus.PAUSED.name
                                                     )
                                                 }
                                             }
+                                            // android.util.Log.d("Active Projects", "Num Active Projects: ${activeProjects.size}")
 
                                             viewModel.updateProjectStatus(
                                                 ProjectStatus.ACTIVE.name,
@@ -2299,22 +2425,6 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                                         expandBillingTypeChoice = false
                                     }
                                 )
-
-                                DropdownMenuItem(
-                                    text = { Text(text = BillingType.WEEKLY.name) },
-                                    onClick = {
-                                        tempProjectBillingType = BillingType.WEEKLY.name
-                                        expandBillingTypeChoice = false
-                                    }
-                                )
-
-                                DropdownMenuItem(
-                                    text = { Text(text = BillingType.DAILY.name) },
-                                    onClick = {
-                                        tempProjectBillingType = BillingType.DAILY.name
-                                        expandBillingTypeChoice = false
-                                    }
-                                )
                             }
                         }
                     }
@@ -2439,14 +2549,14 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
 fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hubTab: String, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
     val clientState = viewModel.clientState.collectAsStateWithLifecycle().value.find { clientId == it.id }
     val project = clientState?.projects?.find { projectId == it.id }
-    var currentTab = hubTab.replaceRange(0, 1, hubTab[0].uppercase())
+    val currentTab = hubTab.replaceRange(0, 1, hubTab[0].uppercase())
 
     val description = project?.description?: ""
     val completedTasks = project?.tasks?.filter { it.isCompleted }?.size
 
     val windowInfo = LocalWindowInfo.current
     val screenWidth = windowInfo.containerDpSize.width
-    val screenHeight = windowInfo.containerDpSize.height
+    // val screenHeight = windowInfo.containerDpSize.height
 
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
@@ -3041,8 +3151,6 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                         when(project?.billingType) {
                             BillingType.HOURLY.name -> { rateType = "/hr" }
                             BillingType.FIXED.name -> { rateType = " Total" }
-                            BillingType.DAILY.name -> { rateType = "/day" }
-                            BillingType.WEEKLY.name -> { rateType = "/week" }
                         }
 
                         Text(
@@ -3278,22 +3386,6 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                                         expandBillingTypeChoice = false
                                     }
                                 )
-
-                                DropdownMenuItem(
-                                    text = { Text(text = BillingType.WEEKLY.name) },
-                                    onClick = {
-                                        tempProjectBillingType = BillingType.WEEKLY.name
-                                        expandBillingTypeChoice = false
-                                    }
-                                )
-
-                                DropdownMenuItem(
-                                    text = { Text(text = BillingType.DAILY.name) },
-                                    onClick = {
-                                        tempProjectBillingType = BillingType.DAILY.name
-                                        expandBillingTypeChoice = false
-                                    }
-                                )
                             }
                         }
                     }
@@ -3328,8 +3420,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                                         newDeadline = tempProjectDeadline,
                                         newBT = tempProjectBillingType,
                                         newPayrate = tempProjectRate,
-                                        newBudget = tempProjectBudget,
-                                        newStatus = tempProjectStatus
+                                        newBudget = tempProjectBudget
                                     )
                                     tempProjectTitle = ""
                                     tempProjectDescription = ""
@@ -3415,7 +3506,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
 }
 
 @Composable
-fun TasksScreen(projectName: String, projectId: Int, clientId: Int, hubTab: String, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
+fun TasksScreen(projectName: String, projectId: Int, clientId: Int, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
     val clientState = viewModel.clientState.collectAsStateWithLifecycle().value.find { clientId == it.id }
     val project = clientState?.projects?.find { it.id == projectId }
     val tasks = project?.tasks?: emptyList()
@@ -3952,6 +4043,418 @@ fun TasksScreen(projectName: String, projectId: Int, clientId: Int, hubTab: Stri
 }
 
 @Composable
+fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
+    val clientState =
+        viewModel.clientState.collectAsStateWithLifecycle().value.find { clientId == it.id }
+    val project = clientState?.projects?.find { it.id == projectId }
+    val timeLogs = project?.timeLogs?: emptyList()
+
+    var localTimeLogs by remember(timeLogs) { mutableStateOf(timeLogs) }
+
+    val lazyListState = rememberLazyListState()
+    val reorderableState =
+        rememberReorderableLazyListState(lazyListState = lazyListState) { from, to ->
+            localTimeLogs = localTimeLogs.toMutableList().apply {
+                add(to.index, removeAt(from.index))
+            }
+        }
+
+    var expandTaskOptions by remember { mutableStateOf<Int?>(null) }
+    var isReordering by remember { mutableStateOf(false) }
+
+    var isAddingTimeLog by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding)
+            .background(color = Color(0xFFF2F2F2L)),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Card(
+            elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
+            shape = RectangleShape
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(color = Color.White)
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "$projectName Time Logs",
+                    fontSize = 25.sp,
+                    fontWeight = Bold,
+                    fontFamily = FontFamily.SansSerif,
+                    color = Color.Black
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(color = Color.White),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/overview") },
+                    shape = RectangleShape,
+                    colors = ButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Gray,
+                        disabledContainerColor = Color.White,
+                        disabledContentColor = Color.Gray
+                    )
+                ) {
+                    Text("Overview")
+                }
+
+                Button(
+                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/tasks") },
+                    shape = RectangleShape,
+                    colors = ButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Gray,
+                        disabledContainerColor = Color.White,
+                        disabledContentColor = Color.Gray
+                    )
+                ) {
+                    Text("Tasks")
+                }
+
+                Button(
+                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/logs") },
+                    shape = RectangleShape,
+                    colors = ButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Gray,
+                        disabledContainerColor = Color.White,
+                        disabledContentColor = Color.Gray
+                    )
+                ) {
+                    Text("Time Logs")
+                }
+
+                Button(
+                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/invoices") },
+                    shape = RectangleShape,
+                    colors = ButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Gray,
+                        disabledContainerColor = Color.White,
+                        disabledContentColor = Color.Gray
+                    )
+                ) {
+                    Text("Invoices")
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(40.dp),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Start",
+                color = Color.Black,
+                textAlign = TextAlign.Center
+            )
+
+            Text(
+                text = "End",
+                color = Color.Black,
+                textAlign = TextAlign.Center
+            )
+
+            Text(
+                text = "Billable",
+                color = Color.Black,
+                textAlign = TextAlign.Center
+            )
+
+            Text(
+                text = "Date",
+                color = Color.Black,
+                textAlign = TextAlign.Center
+            )
+        }
+
+        HorizontalDivider(thickness = 1.dp, color = Color.Gray)
+
+        LazyColumn(state = lazyListState) {
+            items(localTimeLogs, key = { timeLog -> timeLog.id }) { timeLog ->
+                val formatter = DateTimeFormatter.ofPattern("hh:mm", Locale.getDefault())
+                val startTimeObj = LocalTime.ofNanoOfDay(timeLog.startTime)
+                val endTimeObj = LocalTime.ofNanoOfDay(timeLog.endTime)
+
+                val startTimeStr = startTimeObj.format(formatter)
+                val endTimeStr = endTimeObj.format(formatter)
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(55.dp)
+                        .padding(vertical = 8.dp)
+                        .combinedClickable(
+                            onClick = { },
+                            onLongClick = {
+                                expandTaskOptions = timeLog.id
+                            }
+                        ),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
+                    Text(
+                        text = startTimeStr,
+                        fontSize = 14.sp,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(start = 10.dp)
+                    )
+                    DropdownMenu(
+                        expanded = expandTaskOptions == timeLog.id,
+                        onDismissRequest = { expandTaskOptions = null }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Delete") },
+                            onClick = {
+                                viewModel.deleteTask(timeLog.id)
+                                expandTaskOptions = null
+                            }
+                        )
+
+                        DropdownMenuItem(
+                            text = { Text("Edit") },
+                            onClick = {
+
+                            }
+                        )
+
+                        DropdownMenuItem(
+                            text = { Text("Move") },
+                            onClick = {
+                                isReordering = true
+                                expandTaskOptions = null
+                            }
+                        )
+                    }
+
+                    Text(
+                        text = endTimeStr,
+                        fontSize = 14.sp,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(start = 10.dp)
+                    )
+
+                    val endTime = LocalTime.ofNanoOfDay(timeLog.endTime)
+                    val startTime = LocalTime.ofNanoOfDay(timeLog.startTime)
+                    val totalTime = Duration.between(startTime, endTime)
+                    Text(
+                        text = "${totalTime.toHours()}H",
+                        fontSize = 14.sp,
+                        color = Color.Black,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Text(
+                        text = timeLog.date,
+                        fontSize = 14.sp,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        modifier = Modifier.size(40.dp),
+                        onClick = {
+                            isAddingTimeLog = true
+                        },
+                        colors = IconButtonColors(
+                            containerColor = Color.Blue,
+                            contentColor = Color.White,
+                            disabledContentColor = Color.White,
+                            disabledContainerColor = Color.Blue
+                        ),
+                        shape = CircleShape
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add Client",
+                            modifier = Modifier.size(23.dp),
+                            tint = Color.White
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    if (isAddingTimeLog) {
+        Dialog(
+            onDismissRequest = { isAddingTimeLog = false }
+        ) {
+            DialogBoxSkeleton(
+                width = 550.dp,
+                height = 200.dp,
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Text(
+                        text = "Add Time Log",
+                        fontSize = 25.sp,
+                        fontWeight = Bold
+                    )
+
+                    OutlinedTextField(
+                        value = "",
+                        onValueChange = {
+
+                        },
+                        label = { Text("Start Time") },
+
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding)
+            .background(color = Color(0xFFF2F2F2L)),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Card(
+            elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
+            shape = RectangleShape
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(color = Color.White)
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "$projectName Invoices",
+                    fontSize = 25.sp,
+                    fontWeight = Bold,
+                    fontFamily = FontFamily.SansSerif,
+                    color = Color.Black
+                )
+
+                IconButton(
+                    modifier = Modifier.size(20.dp),
+                    onClick = {
+
+                    },
+                    colors = IconButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Black,
+                        disabledContentColor = Color.Black,
+                        disabledContainerColor = Color.White
+                    ),
+                    shape = CircleShape
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit Project Info",
+                        modifier = Modifier.size(20.dp),
+                        tint = Color.Black
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(color = Color.White),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/overview") },
+                    shape = RectangleShape,
+                    colors = ButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Gray,
+                        disabledContainerColor = Color.White,
+                        disabledContentColor = Color.Gray
+                    )
+                ) {
+                    Text("Overview")
+                }
+
+                Button(
+                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/tasks") },
+                    shape = RectangleShape,
+                    colors = ButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Gray,
+                        disabledContainerColor = Color.White,
+                        disabledContentColor = Color.Gray
+                    )
+                ) {
+                    Text("Tasks")
+                }
+
+                Button(
+                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/logs") },
+                    shape = RectangleShape,
+                    colors = ButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Gray,
+                        disabledContainerColor = Color.White,
+                        disabledContentColor = Color.Gray
+                    )
+                ) {
+                    Text("Time Logs")
+                }
+
+                Button(
+                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/invoices") },
+                    shape = RectangleShape,
+                    colors = ButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Gray,
+                        disabledContainerColor = Color.White,
+                        disabledContentColor = Color.Gray
+                    )
+                ) {
+                    Text("Invoices")
+                }
+            }
+        }
+
+        // Begin making invoice rows
+    }
+}
+
+@Composable
 fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, innerPadding: PaddingValues) {
     Column(
         modifier = Modifier
@@ -4003,10 +4506,16 @@ fun convertMillisToDate(millis: Long): String {
 fun TimerText(timeLog: HomeViewModel.TimeLogData?, settings: SettingsEntity) {
     val longStartTime = timeLog?.startTime
 
-    val startTime = LocalTime.ofNanoOfDay(longStartTime ?: 0)
-
-    // 1. ✅ FIX: Turn this into a tracked Compose State, initialized to the current time
+    val startTime = LocalTime.ofNanoOfDay(longStartTime?: 0)
     var timeRightNow by remember { mutableStateOf(LocalTime.now()) }
+
+    // val longPausedStartTime = timeLog?.pauseStartTime?: timeRightNow.toNanoOfDay()
+
+    // val longCurrentPausedTime = timeRightNow.toNanoOfDay() - longPausedStartTime
+
+    // val longCorrectedCurrentTime = timeRightNow.toNanoOfDay() - (timeLog?.totalPauseTime?: 0) - longCurrentPausedTime
+
+    // val correctedCurrentTime = LocalTime.ofNanoOfDay(longCorrectedCurrentTime)
 
     // 2. Calculate the duration dynamically based on the living state variable
     val timerTime = Duration.between(startTime, timeRightNow)
@@ -4029,6 +4538,18 @@ fun TimerText(timeLog: HomeViewModel.TimeLogData?, settings: SettingsEntity) {
         fontSize = 20.sp,
         fontWeight = Bold,
         fontFamily = FontFamily.SansSerif,
-        color = Color.Black
+        color = Color.Black,
+        modifier = Modifier.fillMaxWidth(),
+        textAlign = TextAlign.Center
     )
+}
+
+@Composable
+fun DialogBoxSkeleton(width: Dp, height: Dp, content: @Composable (() -> Unit)) {
+    Surface(
+        color = Color.White,
+        modifier = Modifier.size(width, height),
+        shape = RoundedCornerShape(25.dp),
+        border = BorderStroke(2.dp, Color.Gray)
+    ) { content() }
 }
