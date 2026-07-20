@@ -60,6 +60,7 @@ import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -69,19 +70,24 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.TimePickerDialog
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusModifier
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -124,6 +130,7 @@ import java.util.Locale
 import java.time.LocalTime
 import java.time.Duration
 import java.time.format.DateTimeFormatter
+import java.util.Calendar
 import kotlin.time.Duration.Companion.milliseconds
 
 class MainActivity : ComponentActivity() {
@@ -4042,6 +4049,7 @@ fun TasksScreen(projectName: String, projectId: Int, clientId: Int, viewModel: H
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
     val clientState =
@@ -4059,10 +4067,40 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
             }
         }
 
+    // 2. State to hold the chosen time display text
+    var selectedStartTimeText by remember { mutableStateOf("No time selected") }
+    var selectedEndTimeText by remember { mutableStateOf("No time selected") }
+
+    var longSelectedStartTime by remember { mutableLongStateOf(0L) }
+    var longSelectedEndTime by remember { mutableLongStateOf(0L) }
+
+    // 3. Setup the initial state of the clock picker (defaults to the current device hour/minute)
+    val currentTime = Calendar.getInstance()
+    val startTimePickerState = rememberTimePickerState(
+        initialHour = currentTime.get(Calendar.HOUR_OF_DAY),
+        initialMinute = currentTime.get(Calendar.MINUTE),
+        is24Hour = false // Set to true for 24-hour mode
+    )
+
+    val endTimePickerState = rememberTimePickerState(
+        initialHour = currentTime.get(Calendar.HOUR_OF_DAY),
+        initialMinute = currentTime.get(Calendar.MINUTE),
+        is24Hour = false // Set to true for 24-hour mode
+    )
+
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState()
+    val selectedDate = datePickerState.selectedDateMillis?.let {
+        convertMillisToDate(it)
+    } ?: "No date selected"
+
     var expandTaskOptions by remember { mutableStateOf<Int?>(null) }
     var isReordering by remember { mutableStateOf(false) }
-
     var isAddingTimeLog by remember { mutableStateOf(false) }
+    var openStartTimePicker by remember { mutableStateOf(false) }
+    var openEndTimePicker by remember { mutableStateOf(false) }
+    var tempSelectedDate by remember { mutableStateOf("--/--/----") }
+    var showEmptyFieldDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -4189,86 +4227,91 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
 
         LazyColumn(state = lazyListState) {
             items(localTimeLogs, key = { timeLog -> timeLog.id }) { timeLog ->
-                val formatter = DateTimeFormatter.ofPattern("hh:mm", Locale.getDefault())
-                val startTimeObj = LocalTime.ofNanoOfDay(timeLog.startTime)
-                val endTimeObj = LocalTime.ofNanoOfDay(timeLog.endTime)
-
-                val startTimeStr = startTimeObj.format(formatter)
-                val endTimeStr = endTimeObj.format(formatter)
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(55.dp)
-                        .padding(vertical = 8.dp)
-                        .combinedClickable(
-                            onClick = { },
-                            onLongClick = {
-                                expandTaskOptions = timeLog.id
-                            }
-                        ),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceAround
+                ReorderableItem(
+                    state = reorderableState,
+                    key = timeLog.id
                 ) {
-                    Text(
-                        text = startTimeStr,
-                        fontSize = 14.sp,
-                        color = Color.Gray,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(start = 10.dp)
-                    )
-                    DropdownMenu(
-                        expanded = expandTaskOptions == timeLog.id,
-                        onDismissRequest = { expandTaskOptions = null }
+                    val formatter = DateTimeFormatter.ofPattern("hh:mm", Locale.getDefault())
+                    val startTimeObj = LocalTime.ofNanoOfDay(timeLog.startTime)
+                    val endTimeObj = LocalTime.ofNanoOfDay(timeLog.endTime)
+
+                    val startTimeStr = startTimeObj.format(formatter)
+                    val endTimeStr = endTimeObj.format(formatter)
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(55.dp)
+                            .padding(vertical = 8.dp)
+                            .combinedClickable(
+                                onClick = { },
+                                onLongClick = {
+                                    expandTaskOptions = timeLog.id
+                                }
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceAround
                     ) {
-                        DropdownMenuItem(
-                            text = { Text("Delete") },
-                            onClick = {
-                                viewModel.deleteTask(timeLog.id)
-                                expandTaskOptions = null
-                            }
+                        Text(
+                            text = startTimeStr,
+                            fontSize = 14.sp,
+                            color = Color.Gray,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(start = 10.dp)
+                        )
+                        DropdownMenu(
+                            expanded = expandTaskOptions == timeLog.id,
+                            onDismissRequest = { expandTaskOptions = null }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Delete") },
+                                onClick = {
+                                    viewModel.deleteTask(timeLog.id)
+                                    expandTaskOptions = null
+                                }
+                            )
+
+                            DropdownMenuItem(
+                                text = { Text("Edit") },
+                                onClick = {
+
+                                }
+                            )
+
+                            DropdownMenuItem(
+                                text = { Text("Move") },
+                                onClick = {
+                                    isReordering = true
+                                    expandTaskOptions = null
+                                }
+                            )
+                        }
+
+                        Text(
+                            text = endTimeStr,
+                            fontSize = 14.sp,
+                            color = Color.Gray,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(start = 10.dp)
                         )
 
-                        DropdownMenuItem(
-                            text = { Text("Edit") },
-                            onClick = {
-
-                            }
+                        val endTime = LocalTime.ofNanoOfDay(timeLog.endTime)
+                        val startTime = LocalTime.ofNanoOfDay(timeLog.startTime)
+                        val totalTime = Duration.between(startTime, endTime)
+                        Text(
+                            text = "${totalTime.toHours()}H",
+                            fontSize = 14.sp,
+                            color = Color.Black,
+                            textAlign = TextAlign.Center
                         )
 
-                        DropdownMenuItem(
-                            text = { Text("Move") },
-                            onClick = {
-                                isReordering = true
-                                expandTaskOptions = null
-                            }
+                        Text(
+                            text = timeLog.date,
+                            fontSize = 14.sp,
+                            color = Color.Gray,
+                            textAlign = TextAlign.Center
                         )
                     }
-
-                    Text(
-                        text = endTimeStr,
-                        fontSize = 14.sp,
-                        color = Color.Gray,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(start = 10.dp)
-                    )
-
-                    val endTime = LocalTime.ofNanoOfDay(timeLog.endTime)
-                    val startTime = LocalTime.ofNanoOfDay(timeLog.startTime)
-                    val totalTime = Duration.between(startTime, endTime)
-                    Text(
-                        text = "${totalTime.toHours()}H",
-                        fontSize = 14.sp,
-                        color = Color.Black,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Text(
-                        text = timeLog.date,
-                        fontSize = 14.sp,
-                        color = Color.Gray,
-                        textAlign = TextAlign.Center
-                    )
                 }
             }
 
@@ -4311,7 +4354,7 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
         ) {
             DialogBoxSkeleton(
                 width = 550.dp,
-                height = 200.dp,
+                height = 350.dp,
             ) {
                 Column(
                     modifier = Modifier.fillMaxSize(),
@@ -4325,13 +4368,394 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
                     )
 
                     OutlinedTextField(
-                        value = "",
-                        onValueChange = {
-
-                        },
+                        value = selectedStartTimeText,
+                        onValueChange = {  },
                         label = { Text("Start Time") },
-
+                        readOnly = true,
+                        trailingIcon = {
+                            IconButton(
+                                modifier = Modifier.size(40.dp, 40.dp),
+                                onClick = {
+                                    openStartTimePicker = true
+                                },
+                                colors = IconButtonColors(
+                                    containerColor = Color.White,
+                                    contentColor = Color.Black,
+                                    disabledContentColor = Color.Black,
+                                    disabledContainerColor = Color.White
+                                ),
+                                shape = CircleShape
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Timer,
+                                    contentDescription = "Start Time",
+                                    modifier = Modifier.size(25.dp),
+                                    tint = Color.Black
+                                )
+                            }
+                        }
                     )
+
+                    OutlinedTextField(
+                        value = selectedEndTimeText,
+                        onValueChange = {  },
+                        label = { Text("End Time") },
+                        readOnly = true,
+                        trailingIcon = {
+                            IconButton(
+                                modifier = Modifier.size(40.dp, 40.dp),
+                                onClick = {
+                                    openEndTimePicker = true
+                                },
+                                colors = IconButtonColors(
+                                    containerColor = Color.White,
+                                    contentColor = Color.Black,
+                                    disabledContentColor = Color.Black,
+                                    disabledContainerColor = Color.White
+                                ),
+                                shape = CircleShape
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Timer,
+                                    contentDescription = "End Time",
+                                    modifier = Modifier.size(25.dp),
+                                    tint = Color.Black
+                                )
+                            }
+                        }
+                    )
+
+                    OutlinedTextField(
+                        value = selectedDate,
+                        onValueChange = { },
+                        label = { Text("Task Deadline") },
+                        readOnly = true,
+                        trailingIcon = {
+                            IconButton(onClick = { showDatePicker = !showDatePicker }) {
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = "Select date"
+                                )
+                            }
+                        }
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceAround,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = {
+                                isAddingTimeLog = false
+                            },
+                            colors = ButtonColors(
+                                containerColor = Color.LightGray,
+                                contentColor = Color.Black,
+                                disabledContainerColor = Color.LightGray,
+                                disabledContentColor = Color.Black
+                            )
+                        ) {
+                            Text(
+                                text = "Cancel",
+                                fontWeight = Bold,
+                                fontSize = 18.sp,
+                                color = Color.Black
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                if (longSelectedStartTime != 0L && longSelectedEndTime != 0L && tempSelectedDate != "--/--/----") {
+                                    viewModel.createTimeLog(
+                                        projectId = projectId,
+                                        startTime = longSelectedStartTime,
+                                        endTime = longSelectedEndTime,
+                                        date = tempSelectedDate
+                                    )
+
+                                    isAddingTimeLog = false
+                                } else {
+                                    showEmptyFieldDialog = true
+                                }
+                            },
+                            colors = ButtonColors(
+                                containerColor = Color.LightGray,
+                                contentColor = Color.Black,
+                                disabledContainerColor = Color.LightGray,
+                                disabledContentColor = Color.Black
+                            )
+                        ) {
+                            Text(
+                                text = "Confirm",
+                                fontWeight = Bold,
+                                fontSize = 18.sp,
+                                color = Color.Black
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // start time picker
+    if (openStartTimePicker) {
+        TimePickerDialog(
+            onDismissRequest = { openStartTimePicker = false },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val amPm = if (startTimePickerState.hour >= 12) "PM" else "AM"
+                        val displayHour = when {
+                            startTimePickerState.hour == 0 -> 12
+                            startTimePickerState.hour > 12 -> startTimePickerState.hour - 12
+                            else -> startTimePickerState.hour
+                        }
+
+                        val hour = startTimePickerState.hour
+                        val minute = startTimePickerState.minute
+
+                        longSelectedStartTime = LocalTime.of(hour, minute).toNanoOfDay()
+
+                        selectedStartTimeText = String.format(
+                            Locale.getDefault(),
+                            "%02d:%02d %s",
+                            displayHour,
+                            startTimePickerState.minute,
+                            amPm
+                        )
+                        openStartTimePicker = false
+                    },
+                    // shape = RoundedCornerShape(8.dp),
+                    colors = ButtonColors(
+                        containerColor = Color.Cyan,
+                        contentColor = Color.Black,
+                        disabledContainerColor = Color.Cyan,
+                        disabledContentColor = Color.Black
+                    )
+                    // modifier = Modifier.padding(horizontal = 35.dp)
+                ) {
+                    Text(
+                        text = "Confirm",
+                        fontWeight = Bold,
+                        fontSize = 14.sp,
+                        color = Color.Black
+                    )
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = {
+                        openStartTimePicker = false
+                    },
+                    // shape = RoundedCornerShape(8.dp),
+                    colors = ButtonColors(
+                        containerColor = Color.LightGray,
+                        contentColor = Color.Black,
+                        disabledContainerColor = Color.LightGray,
+                        disabledContentColor = Color.Black
+                    ),
+                    modifier = Modifier.padding(end = 90.dp)
+                ) {
+                    Text(
+                        text = "Cancel",
+                        fontWeight = Bold,
+                        fontSize = 14.sp,
+                        color = Color.Black
+                    )
+                }
+            },
+            title = { Text("Start Time") }
+        ) {
+            TimePicker(state = startTimePickerState)
+        }
+    }
+
+    // end time picker
+    if (openEndTimePicker) {
+        TimePickerDialog(
+            onDismissRequest = { openEndTimePicker = false },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val amPm = if (endTimePickerState.hour >= 12) "PM" else "AM"
+                        val displayHour = when {
+                            endTimePickerState.hour == 0 -> 12
+                            endTimePickerState.hour > 12 -> endTimePickerState.hour - 12
+                            else -> endTimePickerState.hour
+                        }
+
+                        val hour = endTimePickerState.hour
+                        val minute = endTimePickerState.minute
+
+                        longSelectedEndTime = LocalTime.of(hour, minute).toNanoOfDay()
+
+                        selectedEndTimeText = String.format(
+                            Locale.getDefault(),
+                            "%02d:%02d %s",
+                            displayHour,
+                            endTimePickerState.minute,
+                            amPm
+                        )
+                        openEndTimePicker = false
+                    },
+                    // shape = RoundedCornerShape(8.dp),
+                    colors = ButtonColors(
+                        containerColor = Color.Cyan,
+                        contentColor = Color.Black,
+                        disabledContainerColor = Color.Cyan,
+                        disabledContentColor = Color.Black
+                    )
+                ) {
+                    Text(
+                        text = "Confirm",
+                        fontWeight = Bold,
+                        fontSize = 18.sp,
+                        color = Color.Black
+                    )
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = {
+                        openEndTimePicker = false
+                    },
+                    // shape = RoundedCornerShape(8.dp),
+                    colors = ButtonColors(
+                        containerColor = Color.LightGray,
+                        contentColor = Color.Black,
+                        disabledContainerColor = Color.LightGray,
+                        disabledContentColor = Color.Black
+                    ),
+                    modifier = Modifier.padding(end = 90.dp)
+                ) {
+                    Text(
+                        text = "Cancel",
+                        fontWeight = Bold,
+                        fontSize = 18.sp,
+                        color = Color.Black
+                    )
+                }
+            },
+            title = { Text("End Time") }
+        ) {
+            TimePicker(state = endTimePickerState)
+        }
+    }
+
+    // show date picker
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        tempSelectedDate = selectedDate
+                        showDatePicker = false
+                    },
+                    // shape = RoundedCornerShape(8.dp),
+                    colors = ButtonColors(
+                        containerColor = Color.Cyan,
+                        contentColor = Color.Black,
+                        disabledContainerColor = Color.Cyan,
+                        disabledContentColor = Color.Black
+                    ),
+                    modifier = Modifier.padding(horizontal = 35.dp)
+                ) {
+                    Text(
+                        text = "Confirm",
+                        fontWeight = Bold,
+                        fontSize = 18.sp,
+                        color = Color.Black
+                    )
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = {
+                        showDatePicker = false
+                    },
+                    // shape = RoundedCornerShape(8.dp),
+                    colors = ButtonColors(
+                        containerColor = Color.LightGray,
+                        contentColor = Color.Black,
+                        disabledContainerColor = Color.LightGray,
+                        disabledContentColor = Color.Black
+                    ),
+                    modifier = Modifier.padding(end = 20.dp)
+                ) {
+                    Text(
+                        text = "Cancel",
+                        fontWeight = Bold,
+                        fontSize = 18.sp,
+                        color = Color.Black
+                    )
+                }
+            }
+        ) {
+            DatePicker(
+                state = datePickerState,
+                showModeToggle = false
+            )
+        }
+    }
+
+    if (showEmptyFieldDialog) {
+        Dialog(
+            onDismissRequest = {
+                showEmptyFieldDialog = false
+            }
+        ) {
+            DialogBoxSkeleton(
+                width = 550.dp,
+                height = 200.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = "Empty Field Warning",
+                        tint = Color.Gray,
+                        modifier = Modifier.size(30.dp)
+                    )
+
+                    Text(
+                        text = "Empty Field",
+                        fontWeight = Bold,
+                        fontSize = 25.sp,
+                        color = Color.Black
+                    )
+
+                    Text(
+                        text = "Please fill in all fields",
+                        fontSize = 17.sp,
+                        color = Color.Gray
+                    )
+
+                    Button(
+                        onClick = {
+                            showEmptyFieldDialog = false
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Cyan,
+                            contentColor = Color.Black,
+                            disabledContainerColor = Color.Cyan,
+                            disabledContentColor = Color.Black
+                        )
+                    ) {
+                        Text(
+                            text = "Dismiss",
+                            fontWeight = Bold,
+                            fontSize = 20.sp,
+                            color = Color.Black
+                        )
+                    }
                 }
             }
         }

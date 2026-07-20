@@ -217,6 +217,23 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun createTimeLog(projectId: Int, startTime: Long, endTime: Long, date: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val currentTimeLogsCount = dao.getTimeLogsFromProjectId(projectId).size
+
+            dao.insertTimeLog(
+                TimeLogsEntity(
+                    id = 0,
+                    projectId = projectId,
+                    startTime = startTime,
+                    endTime = endTime,
+                    date = date,
+                    orderIndex = currentTimeLogsCount
+                )
+            )
+        }
+    }
+
     // fun toggleTaskCompletion(task: TaskDataEntity) {
     //     viewModelScope.launch(Dispatchers.IO) {
     //         dao.insertTask(task.copy(isCompleted = !task.isCompleted)) // REPLACE strategy updates it
@@ -229,12 +246,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startTrackingTime(projectId: Int, startTime: Long) {
         viewModelScope.launch(Dispatchers.IO) {
+            val currentTimeLogsCount = dao.getTimeLogsFromProjectId(projectId).size
+
             val date = LocalDate.now()
             val formatterA = DateTimeFormatter.ofPattern("MM/dd/yyyy", Locale.getDefault())
             val formattedDateA = date.format(formatterA)
 
             dao.insertTimeLog(
-                TimeLogsEntity(id = 0, projectId = projectId, startTime = startTime, date = formattedDateA)
+                TimeLogsEntity(
+                    id = 0,
+                    projectId = projectId,
+                    startTime = startTime,
+                    date = formattedDateA,
+                    orderIndex = currentTimeLogsCount
+                )
             )
         }
     }

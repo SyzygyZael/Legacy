@@ -61,7 +61,8 @@ data class TimeLogsEntity(
     // val pauseEndTime: Long = 0L,
     // val totalPauseTime: Long = 0L,
     val isBilled: Boolean = false,
-    val date: String = "--/--/----"
+    val date: String = "--/--/----",
+    val orderIndex: Int
 )
 
 @Entity(tableName = "invoices")
@@ -172,6 +173,9 @@ interface AppDao {
 
     @Query("SELECT * FROM clients")
     suspend fun getAllClientsList(): List<ClientDataEntity>
+
+    @Query("SELECT * FROM time_logs WHERE projectId = :projectId")
+    suspend fun getTimeLogsFromProjectId(projectId: Int): List<TimeLogsEntity>
 
     // TIMER QUERIES
     @Query("UPDATE settings SET isTiming = :timeState WHERE id = 1")
