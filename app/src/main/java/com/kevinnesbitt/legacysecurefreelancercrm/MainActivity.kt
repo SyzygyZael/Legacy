@@ -1,6 +1,7 @@
 package com.kevinnesbitt.legacysecurefreelancercrm
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -18,6 +19,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -87,11 +90,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusModifier
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -164,7 +167,8 @@ class MainActivity : ComponentActivity() {
                             Row(
                                 modifier = Modifier
                                     .size(width = screenWidth, height = 55.dp)
-                                    .background(color = Color.White),
+                                    .background(color = Color.White)
+                                    .navigationBarsPadding(),
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
                                 IconButton(
@@ -2030,7 +2034,7 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
 
                     ) {
                     Text(
-                        text = "New Client",
+                        text = "Edit Client",
                         textAlign = TextAlign.Center,
                         fontSize = 21.sp,
                         modifier = Modifier
@@ -4052,6 +4056,8 @@ fun TasksScreen(projectName: String, projectId: Int, clientId: Int, viewModel: H
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
+    val settings by viewModel.settings.collectAsState()
+
     val clientState =
         viewModel.clientState.collectAsStateWithLifecycle().value.find { clientId == it.id }
     val project = clientState?.projects?.find { it.id == projectId }
@@ -4073,6 +4079,8 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
 
     var longSelectedStartTime by remember { mutableLongStateOf(0L) }
     var longSelectedEndTime by remember { mutableLongStateOf(0L) }
+
+    var tempLogId by remember { mutableIntStateOf(0) }
 
     // 3. Setup the initial state of the clock picker (defaults to the current device hour/minute)
     val currentTime = Calendar.getInstance()
@@ -4101,6 +4109,8 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
     var openEndTimePicker by remember { mutableStateOf(false) }
     var tempSelectedDate by remember { mutableStateOf("--/--/----") }
     var showEmptyFieldDialog by remember { mutableStateOf(false) }
+    var showTimeDifferenceErrorDialog by remember { mutableStateOf(false) }
+    var isEditingTimeLog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -4128,6 +4138,30 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
                     fontFamily = FontFamily.SansSerif,
                     color = Color.Black
                 )
+
+                if (isReordering) {
+                    IconButton(
+                        modifier = Modifier.size(55.dp, 55.dp),
+                        onClick = {
+                            isReordering = false
+                            viewModel.updateTimeLogsOrder(localTimeLogs)
+                        },
+                        colors = IconButtonColors(
+                            containerColor = Color.White,
+                            contentColor = Color.Black,
+                            disabledContentColor = Color.Black,
+                            disabledContainerColor = Color.White
+                        ),
+                        shape = CircleShape
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = "Done Reordering",
+                            modifier = Modifier.size(23.dp),
+                            tint = Color.Black
+                        )
+                    }
+                }
             }
 
             Row(
@@ -4231,12 +4265,33 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
                     state = reorderableState,
                     key = timeLog.id
                 ) {
-                    val formatter = DateTimeFormatter.ofPattern("hh:mm", Locale.getDefault())
+                    val formatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())
                     val startTimeObj = LocalTime.ofNanoOfDay(timeLog.startTime)
                     val endTimeObj = LocalTime.ofNanoOfDay(timeLog.endTime)
 
-                    val startTimeStr = startTimeObj.format(formatter)
-                    val endTimeStr = endTimeObj.format(formatter)
+                    val startTimeStr = when {
+                        settings.timeFormat == "12-Hour" -> {
+                            startTimeObj.format(formatter)
+                        }
+                        else -> {
+                            val startHour = startTimeObj.hour
+                            val startMinute = startTimeObj.minute
+
+                            "$startHour:$startMinute"
+                        }
+                    }
+
+                    val endTimeStr = when {
+                        settings.timeFormat == "12-Hour" -> {
+                            endTimeObj.format(formatter)
+                        }
+                        else -> {
+                            val endHour = endTimeObj.hour
+                            val endMinute = endTimeObj.minute
+
+                            "$endHour:$endMinute"
+                        }
+                    }
 
                     Row(
                         modifier = Modifier
@@ -4266,7 +4321,7 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
                             DropdownMenuItem(
                                 text = { Text("Delete") },
                                 onClick = {
-                                    viewModel.deleteTask(timeLog.id)
+                                    viewModel.deleteLog(timeLog.id)
                                     expandTaskOptions = null
                                 }
                             )
@@ -4274,7 +4329,40 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
                             DropdownMenuItem(
                                 text = { Text("Edit") },
                                 onClick = {
+                                    val localStartTime = LocalTime.ofNanoOfDay(timeLog.startTime)
+                                    val localEndTime = LocalTime.ofNanoOfDay(timeLog.endTime)
+                                    val formatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())
 
+                                    val startTimeStr = when {
+                                        settings.timeFormat == "12-Hour" -> {
+                                            localStartTime.format(formatter)
+                                        }
+                                        else -> {
+                                            val startHour = localStartTime.hour
+                                            val startMinute = localStartTime.minute
+
+                                            "$startHour:$startMinute"
+                                        }
+                                    }
+
+                                    val endTimeStr = when {
+                                        settings.timeFormat == "12-Hour" -> {
+                                            localEndTime.format(formatter)
+                                        }
+                                        else -> {
+                                            val endHour = localEndTime.hour
+                                            val endMinute = localEndTime.minute
+
+                                            "$endHour:$endMinute"
+                                        }
+                                    }
+
+                                    tempLogId = timeLog.id
+                                    selectedStartTimeText = startTimeStr
+                                    selectedEndTimeText = endTimeStr
+                                    tempSelectedDate = timeLog.date
+
+                                    isEditingTimeLog = true
                                 }
                             )
 
@@ -4292,23 +4380,46 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
                             fontSize = 14.sp,
                             color = Color.Gray,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(start = 10.dp)
+                            modifier = Modifier.padding(end = 15.dp)
                         )
 
                         val endTime = LocalTime.ofNanoOfDay(timeLog.endTime)
                         val startTime = LocalTime.ofNanoOfDay(timeLog.startTime)
-                        val totalTime = Duration.between(startTime, endTime)
+                        val totalTime = when {
+                            startTime.toNanoOfDay() < endTime.toNanoOfDay() -> {
+                                Duration.between(startTime, endTime).toHours()
+                            }
+                            else -> {
+                                Duration.between(startTime, endTime).toHours() + 24
+                            }
+                        }
                         Text(
-                            text = "${totalTime.toHours()}H",
+                            text = "${totalTime}H",
                             fontSize = 14.sp,
                             color = Color.Black,
                             textAlign = TextAlign.Center
                         )
 
+                        val year = timeLog.date.substring(0, 4)
+                        val month = timeLog.date.substring(5, 7)
+                        val day = timeLog.date.substring(8, 10)
                         Text(
-                            text = timeLog.date,
+                            text = "$month/$day/$year",
                             fontSize = 14.sp,
                             color = Color.Gray,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    if (isReordering) {
+                        Text(
+                            text = "…\n…",
+                            fontSize = 25.sp,
+                            fontWeight = Bold,
+                            color = Color.Black,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .draggableHandle(),
                             textAlign = TextAlign.Center
                         )
                     }
@@ -4348,6 +4459,9 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
         }
     }
 
+    // DIALOG BOXES
+
+    // add time log
     if (isAddingTimeLog) {
         Dialog(
             onDismissRequest = { isAddingTimeLog = false }
@@ -4474,7 +4588,170 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
                                         date = tempSelectedDate
                                     )
 
+                                    longSelectedStartTime = 0L
+                                    longSelectedEndTime = 0L
+                                    tempSelectedDate = "--/--/----"
+
                                     isAddingTimeLog = false
+                                } else {
+                                    showEmptyFieldDialog = true
+                                }
+                            },
+                            colors = ButtonColors(
+                                containerColor = Color.LightGray,
+                                contentColor = Color.Black,
+                                disabledContainerColor = Color.LightGray,
+                                disabledContentColor = Color.Black
+                            )
+                        ) {
+                            Text(
+                                text = "Confirm",
+                                fontWeight = Bold,
+                                fontSize = 18.sp,
+                                color = Color.Black
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // edit time log
+    if (isEditingTimeLog) {
+        Dialog(
+            onDismissRequest = { isEditingTimeLog = false }
+        ) {
+            DialogBoxSkeleton(
+                width = 550.dp,
+                height = 350.dp,
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Text(
+                        text = "Add Time Log",
+                        fontSize = 25.sp,
+                        fontWeight = Bold
+                    )
+
+                    OutlinedTextField(
+                        value = selectedStartTimeText,
+                        onValueChange = {  },
+                        label = { Text("Start Time") },
+                        readOnly = true,
+                        trailingIcon = {
+                            IconButton(
+                                modifier = Modifier.size(40.dp, 40.dp),
+                                onClick = {
+                                    openStartTimePicker = true
+                                },
+                                colors = IconButtonColors(
+                                    containerColor = Color.White,
+                                    contentColor = Color.Black,
+                                    disabledContentColor = Color.Black,
+                                    disabledContainerColor = Color.White
+                                ),
+                                shape = CircleShape
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Timer,
+                                    contentDescription = "Start Time",
+                                    modifier = Modifier.size(25.dp),
+                                    tint = Color.Black
+                                )
+                            }
+                        }
+                    )
+
+                    OutlinedTextField(
+                        value = selectedEndTimeText,
+                        onValueChange = {  },
+                        label = { Text("End Time") },
+                        readOnly = true,
+                        trailingIcon = {
+                            IconButton(
+                                modifier = Modifier.size(40.dp, 40.dp),
+                                onClick = {
+                                    openEndTimePicker = true
+                                },
+                                colors = IconButtonColors(
+                                    containerColor = Color.White,
+                                    contentColor = Color.Black,
+                                    disabledContentColor = Color.Black,
+                                    disabledContainerColor = Color.White
+                                ),
+                                shape = CircleShape
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Timer,
+                                    contentDescription = "End Time",
+                                    modifier = Modifier.size(25.dp),
+                                    tint = Color.Black
+                                )
+                            }
+                        }
+                    )
+
+                    OutlinedTextField(
+                        value = if (tempSelectedDate == "--/--/----") selectedDate else tempSelectedDate,
+                        onValueChange = { },
+                        label = { Text("Date") },
+                        readOnly = true,
+                        trailingIcon = {
+                            IconButton(onClick = { showDatePicker = !showDatePicker }) {
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = "Select date"
+                                )
+                            }
+                        }
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceAround,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = {
+                                isEditingTimeLog = false
+                                expandTaskOptions = null
+                            },
+                            colors = ButtonColors(
+                                containerColor = Color.LightGray,
+                                contentColor = Color.Black,
+                                disabledContainerColor = Color.LightGray,
+                                disabledContentColor = Color.Black
+                            )
+                        ) {
+                            Text(
+                                text = "Cancel",
+                                fontWeight = Bold,
+                                fontSize = 18.sp,
+                                color = Color.Black
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                if (longSelectedStartTime != 0L && longSelectedEndTime != 0L && tempSelectedDate != "--/--/----") {
+                                    viewModel.editTimeLogInfo(
+                                        logId = tempLogId,
+                                        startTime = longSelectedStartTime,
+                                        endTime = longSelectedEndTime,
+                                        date = tempSelectedDate
+                                    )
+
+                                    tempLogId = 0
+                                    longSelectedStartTime = 0L
+                                    longSelectedEndTime = 0L
+                                    tempSelectedDate = "--/--/----"
+
+                                    isEditingTimeLog = false
+                                    expandTaskOptions = null
                                 } else {
                                     showEmptyFieldDialog = true
                                 }
@@ -4733,7 +5010,7 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
                     )
 
                     Text(
-                        text = "Please fill in all fields",
+                        text = "Please fill in all fields.",
                         fontSize = 17.sp,
                         color = Color.Gray
                     )
@@ -4741,6 +5018,66 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
                     Button(
                         onClick = {
                             showEmptyFieldDialog = false
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Cyan,
+                            contentColor = Color.Black,
+                            disabledContainerColor = Color.Cyan,
+                            disabledContentColor = Color.Black
+                        )
+                    ) {
+                        Text(
+                            text = "Dismiss",
+                            fontWeight = Bold,
+                            fontSize = 20.sp,
+                            color = Color.Black
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    if (showTimeDifferenceErrorDialog) {
+        Dialog(
+            onDismissRequest = {
+                showTimeDifferenceErrorDialog = false
+            }
+        ) {
+            DialogBoxSkeleton(
+                width = 550.dp,
+                height = 200.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = "Time Difference Warning",
+                        tint = Color.Gray,
+                        modifier = Modifier.size(30.dp)
+                    )
+
+                    Text(
+                        text = "Time Difference",
+                        fontWeight = Bold,
+                        fontSize = 25.sp,
+                        color = Color.Black
+                    )
+
+                    Text(
+                        text = "End time cannot be before start time.",
+                        fontSize = 17.sp,
+                        color = Color.Gray
+                    )
+
+                    Button(
+                        onClick = {
+                            showTimeDifferenceErrorDialog = false
                         },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.Cyan,
@@ -4880,6 +5217,18 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
 
 @Composable
 fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, innerPadding: PaddingValues) {
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    var timeFormatChoiceString by remember(settings) { mutableStateOf(settings.timeFormat) }
+
+    var isChoosingTimeFormat by remember { mutableStateOf(false) }
+
+    val changedSettings = when {
+        (timeFormatChoiceString != settings.timeFormat) -> true
+        else -> false
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -4896,9 +5245,33 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
                     .fillMaxWidth()
                     .background(color = Color.White)
                     .padding(8.dp),
-                horizontalArrangement = Arrangement.Start,
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // save button
+                Button(
+                    enabled = changedSettings,
+                    onClick = {
+                        viewModel.updateSettings(
+                            timeFormat = timeFormatChoiceString
+                        )
+
+                        Toast.makeText(context, "Saved Changes", Toast.LENGTH_LONG).show()
+                    },
+                    colors = ButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Black,
+                        disabledContentColor = Color.LightGray,
+                        disabledContainerColor = Color.White
+                    )
+                ) {
+                    Text(
+                        text = "Save",
+                        fontSize = 17.sp,
+                        fontWeight = Bold
+                    )
+                }
+
                 Text(
                     text = " Settings",
                     fontSize = 25.sp,
@@ -4906,10 +5279,76 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
                     fontFamily = FontFamily.SansSerif,
                     color = Color.Black
                 )
+
+                // filler padding
+                Button(
+                    onClick = {  },
+                    colors = ButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.White,
+                        disabledContentColor = Color.White,
+                        disabledContainerColor = Color.White
+                    )
+                ) {
+                    Text(
+                        text = "Save",
+                        fontSize = 17.sp,
+                        fontWeight = Bold
+                    )
+                }
             }
         }
 
+        // Time Format
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(color = Color.White),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Time Format",
+                modifier = Modifier.padding(21.dp),
+                fontSize = 18.sp,
+                color = Color.Black
+            )
 
+            Card(
+                border = BorderStroke(2.dp, color = Color.Gray),
+                modifier = Modifier
+                    .size(120.dp, 60.dp)
+                    .padding(10.dp)
+                    .clickable(
+                        onClick = {
+                            isChoosingTimeFormat = true
+                        }
+                    )
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Text(text = timeFormatChoiceString)
+                }
+                DropdownMenu(
+                    expanded = isChoosingTimeFormat,
+                    onDismissRequest = { isChoosingTimeFormat = false },
+                    modifier = Modifier.heightIn(max = 180.dp)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("12-Hour") },
+                        onClick = {
+                            timeFormatChoiceString = "12-Hour"
+                        }
+                    )
+
+                    DropdownMenuItem(
+                        text = { Text("24-Hour") },
+                        onClick = {
+                            timeFormatChoiceString = "24-Hour"
+                        }
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -4922,7 +5361,7 @@ fun GreetingPreview() {
 
 // HELPER FUNCTIONS
 fun convertMillisToDate(millis: Long): String {
-    val formatter = SimpleDateFormat("MM/dd/yyyy", Locale.getDefault())
+    val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     return formatter.format(Date(millis))
 }
 

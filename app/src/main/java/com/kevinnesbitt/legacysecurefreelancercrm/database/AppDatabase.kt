@@ -83,7 +83,8 @@ data class SettingsEntity(
     val backgroundColor: Long = 0xFFFFFFFFL,
     val mainTextColor: Long = 0xFF000000L,
     val isTiming: Boolean = false,
-    // val isPaused: Boolean = false
+    // val isPaused: Boolean = false,
+    val timeFormat: String = "12-Hour"
 )
 
 @Dao
@@ -114,7 +115,7 @@ interface AppDao {
     @Query("SELECT * FROM tasks ORDER BY orderIndex ASC")
     fun getAllTasks(): Flow<List<TaskDataEntity>>
 
-    @Query("SELECT * FROM time_logs ORDER BY id DESC")
+    @Query("SELECT * FROM time_logs ORDER BY date DESC, startTime DESC")
     fun getAllTimeLogs(): Flow<List<TimeLogsEntity>>
 
     @Query("SELECT * FROM projects ORDER BY orderIndex ASC")
@@ -160,9 +161,21 @@ interface AppDao {
     @Query("UPDATE tasks SET orderIndex = :newIndex WHERE id = :taskId")
     suspend fun updateTaskPosition(taskId: Int, newIndex: Int)
 
+    @Query("UPDATE time_logs SET orderIndex = :newIndex WHERE id = :logId")
+    suspend fun updateTimeLogPosition(logId: Int, newIndex: Int)
+
+    @Query("UPDATE time_logs SET startTime = :startTime, endTime = :endTime, date = :date WHERE id = :logId")
+    suspend fun updateTimeLogInfo(logId: Int, startTime: Long, endTime: Long, date: String)
+
+    @Query("UPDATE settings SET timeFormat = :timeFormat WHERE id = 1")
+    suspend fun updateSettings(timeFormat: String)
+
     // DELETE QUERIES
     @Query("DELETE FROM tasks WHERE id = :taskId")
     suspend fun deleteTask(taskId: Int)
+
+    @Query("DELETE FROM time_logs WHERE id =:logId")
+    suspend fun deleteLog(logId: Int)
 
     // OTHER QUERIES
     @Query("SELECT * FROM projects WHERE clientId = :clientId")
@@ -210,7 +223,7 @@ interface AppDao {
         InvoiceEntity::class,
         SettingsEntity::class
                          ],
-        version = 17
+        version = 21
     )
     abstract class AppDatabase : RoomDatabase() {
         abstract fun appDao(): AppDao

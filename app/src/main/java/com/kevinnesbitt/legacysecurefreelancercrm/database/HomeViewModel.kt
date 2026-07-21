@@ -74,7 +74,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                                 .map { timeLog ->
                                     TimeLogData(
                                         id = timeLog.id,
-                                        projectId = timeLog.id,
+                                        projectId = timeLog.projectId,
                                         startTime = timeLog.startTime,
                                         endTime = timeLog.endTime,
                                         isBilled = timeLog.isBilled,
@@ -163,6 +163,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     // USER ACTIONS & INTENTS (Database Writes)
     // ==========================================
 
+    fun updateSettings(timeFormat: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.updateSettings(timeFormat)
+        }
+    }
+
     fun createClient(name: String, email: String, telp: String, currency: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val currentClientsCount = dao.getAllClientsList().size
@@ -234,6 +240,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun editTimeLogInfo(logId: Int, startTime: Long, endTime: Long, date: String) {
+        viewModelScope.launch {
+            dao.updateTimeLogInfo(
+                logId = logId,
+                startTime = startTime,
+                endTime = endTime,
+                date = date
+            )
+        }
+    }
+
     // fun toggleTaskCompletion(task: TaskDataEntity) {
     //     viewModelScope.launch(Dispatchers.IO) {
     //         dao.insertTask(task.copy(isCompleted = !task.isCompleted)) // REPLACE strategy updates it
@@ -249,7 +266,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val currentTimeLogsCount = dao.getTimeLogsFromProjectId(projectId).size
 
             val date = LocalDate.now()
-            val formatterA = DateTimeFormatter.ofPattern("MM/dd/yyyy", Locale.getDefault())
+            val formatterA = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.getDefault())
             val formattedDateA = date.format(formatterA)
 
             dao.insertTimeLog(
@@ -259,6 +276,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     startTime = startTime,
                     date = formattedDateA,
                     orderIndex = currentTimeLogsCount
+
                 )
             )
         }
@@ -349,6 +367,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteTask(taskId: Int) {
         viewModelScope.launch {
             dao.deleteTask(taskId)
+        }
+    }
+
+    fun updateTimeLogsOrder(reorderedLogs: List<TimeLogData>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            reorderedLogs.forEachIndexed { index, log ->
+                dao.updateTimeLogPosition(log.id, index)
+            }
+        }
+    }
+
+    fun deleteLog(logId: Int) {
+        viewModelScope.launch {
+            dao.deleteLog(logId)
         }
     }
 
