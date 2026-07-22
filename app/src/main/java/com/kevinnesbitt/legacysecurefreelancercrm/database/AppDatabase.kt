@@ -11,6 +11,7 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.ClientStatus
+import com.kevinnesbitt.legacysecurefreelancercrm.variables.InvoiceStatus
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.ProjectStatus
 import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -70,11 +71,28 @@ data class InvoiceEntity(
     @PrimaryKey(autoGenerate = true) val id: Int,
     val projectId: Int,
     val invoiceNumber: String,
-    val amount: Double,
+    val amount: Double = 0.0,
     val issueDate: String,
     val dueDate: String,
-    val status: String,
+    val issueTo: String,
+    val clientCompany: String,
+    val clientEmail: String,
+    val clientTelephone: String,
+    val payTo: String,
+    val selfAddress: String,
+    val selfEmail: String,
+    val selfTelephone: String,
+    val status: String = InvoiceStatus.DRAFT.name,
     val taxPercentage: Double
+)
+
+@Entity(tableName = "invoice_item")
+data class ItemEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int,
+    val invoiceId: Int,
+    val name: String,
+    val price: Double,
+    val quantity: Int
 )
 
 @Entity(tableName = "settings")
@@ -106,6 +124,9 @@ interface AppDao {
     suspend fun insertInvoice(invoice: InvoiceEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertItem(item: ItemEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSettings(settings: SettingsEntity)
 
     // "GET ALL" QUERIES
@@ -123,6 +144,9 @@ interface AppDao {
 
     @Query("SELECT * FROM clients ORDER BY orderIndex ASC")
     fun getAllClients(): Flow<List<ClientDataEntity>>
+
+    @Query("SELECT * FROM invoice_item")
+    fun getAllInvoiceItems(): Flow<List<ItemEntity>>
 
     @Query("SELECT * FROM settings WHERE id = 1")
     fun getSettings(): Flow<SettingsEntity>
@@ -167,6 +191,12 @@ interface AppDao {
     @Query("UPDATE time_logs SET startTime = :startTime, endTime = :endTime, date = :date WHERE id = :logId")
     suspend fun updateTimeLogInfo(logId: Int, startTime: Long, endTime: Long, date: String)
 
+    @Query("UPDATE invoice_item SET name = :name, price = :price, quantity = :quantity WHERE id = :itemId")
+    suspend fun updateItem(itemId: Int, name: String, price: Double, quantity: Int)
+
+    @Query("UPDATE invoices SET invoiceNumber = :invoiceNumber, issueDate = :issueDate, dueDate = :dueDate, issueTo = :issueTo, clientCompany = :clientCompany, clientEmail = :clientEmail, clientTelephone = :clientTelephone, payTo = :payTo, selfAddress = :selfAddress, selfEmail = :selfEmail, selfTelephone = :selfTelephone, taxPercentage = :taxPercentage, amount = :amount, status = :status")
+    suspend fun updateInvoice(invoiceNumber: String, issueDate: String, dueDate: String, issueTo: String, clientCompany: String, clientEmail: String, clientTelephone: String, payTo: String, selfAddress: String, selfEmail: String, selfTelephone: String, taxPercentage: Double, amount: Double, status: String)
+
     @Query("UPDATE settings SET timeFormat = :timeFormat WHERE id = 1")
     suspend fun updateSettings(timeFormat: String)
 
@@ -176,6 +206,12 @@ interface AppDao {
 
     @Query("DELETE FROM time_logs WHERE id =:logId")
     suspend fun deleteLog(logId: Int)
+
+    @Query("DELETE FROM invoice_item WHERE id = :itemId")
+    suspend fun deleteItem(itemId: Int)
+
+    @Query("DELETE FROM invoices WHERE id = :invoiceId")
+    suspend fun deleteInvoice(invoiceId: Int)
 
     // OTHER QUERIES
     @Query("SELECT * FROM projects WHERE clientId = :clientId")
@@ -221,9 +257,10 @@ interface AppDao {
         TaskDataEntity::class,
         TimeLogsEntity::class,
         InvoiceEntity::class,
+        ItemEntity::class,
         SettingsEntity::class
                          ],
-        version = 21
+        version = 23
     )
     abstract class AppDatabase : RoomDatabase() {
         abstract fun appDao(): AppDao

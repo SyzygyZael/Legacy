@@ -1,6 +1,7 @@
 package com.kevinnesbitt.legacysecurefreelancercrm
 
 import android.os.Bundle
+import android.widget.Button
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsEndWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -46,6 +48,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Money
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.StackedLineChart
@@ -75,8 +78,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TimePickerDialog
+import androidx.compose.material3.TimePickerState
 import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -122,6 +125,7 @@ import com.kevinnesbitt.legacysecurefreelancercrm.database.SettingsEntity
 import com.kevinnesbitt.legacysecurefreelancercrm.ui.theme.LegacySecureFreelancerCRMTheme
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.BillingType
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.ClientStatus
+import com.kevinnesbitt.legacysecurefreelancercrm.variables.InvoiceStatus
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.ProjectStatus
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.SupportedCurrency
 import kotlinx.coroutines.delay
@@ -4066,12 +4070,6 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
     var localTimeLogs by remember(timeLogs) { mutableStateOf(timeLogs) }
 
     val lazyListState = rememberLazyListState()
-    val reorderableState =
-        rememberReorderableLazyListState(lazyListState = lazyListState) { from, to ->
-            localTimeLogs = localTimeLogs.toMutableList().apply {
-                add(to.index, removeAt(from.index))
-            }
-        }
 
     // 2. State to hold the chosen time display text
     var selectedStartTimeText by remember { mutableStateOf("No time selected") }
@@ -4084,17 +4082,25 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
 
     // 3. Setup the initial state of the clock picker (defaults to the current device hour/minute)
     val currentTime = Calendar.getInstance()
-    val startTimePickerState = rememberTimePickerState(
-        initialHour = currentTime.get(Calendar.HOUR_OF_DAY),
-        initialMinute = currentTime.get(Calendar.MINUTE),
-        is24Hour = false // Set to true for 24-hour mode
-    )
+    var startTimePickerState by remember {
+        mutableStateOf(
+            TimePickerState(
+                initialHour = currentTime.get(Calendar.HOUR_OF_DAY),
+                initialMinute = currentTime.get(Calendar.MINUTE),
+                is24Hour = settings.timeFormat == "24-Hour"
+            )
+        )
+    }
 
-    val endTimePickerState = rememberTimePickerState(
-        initialHour = currentTime.get(Calendar.HOUR_OF_DAY),
-        initialMinute = currentTime.get(Calendar.MINUTE),
-        is24Hour = false // Set to true for 24-hour mode
-    )
+    var endTimePickerState by remember {
+        mutableStateOf(
+            TimePickerState(
+                initialHour = currentTime.get(Calendar.HOUR_OF_DAY),
+                initialMinute = currentTime.get(Calendar.MINUTE),
+                is24Hour = settings.timeFormat == "24-Hour"
+            )
+        )
+    }
 
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
@@ -4261,168 +4267,182 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
 
         LazyColumn(state = lazyListState) {
             items(localTimeLogs, key = { timeLog -> timeLog.id }) { timeLog ->
-                ReorderableItem(
-                    state = reorderableState,
-                    key = timeLog.id
+                val formatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())
+                val startTimeObj = LocalTime.ofNanoOfDay(timeLog.startTime)
+                val endTimeObj = LocalTime.ofNanoOfDay(timeLog.endTime)
+
+                val startTimeStr = when {
+                    settings.timeFormat == "12-Hour" -> {
+                        startTimeObj.format(formatter)
+                    }
+                    else -> {
+                        val startHour = startTimeObj.hour
+                        val startMinute = startTimeObj.minute
+
+                        "$startHour:$startMinute"
+                    }
+                }
+
+                val endTimeStr = when {
+                    settings.timeFormat == "12-Hour" -> {
+                        endTimeObj.format(formatter)
+                    }
+                    else -> {
+                        val endHour = endTimeObj.hour
+                        val endMinute = endTimeObj.minute
+
+                        "$endHour:$endMinute"
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(55.dp)
+                        .padding(vertical = 8.dp)
+                        .combinedClickable(
+                            onClick = { },
+                            onLongClick = {
+                                expandTaskOptions = timeLog.id
+                            }
+                        ),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceAround
                 ) {
-                    val formatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())
-                    val startTimeObj = LocalTime.ofNanoOfDay(timeLog.startTime)
-                    val endTimeObj = LocalTime.ofNanoOfDay(timeLog.endTime)
-
-                    val startTimeStr = when {
-                        settings.timeFormat == "12-Hour" -> {
-                            startTimeObj.format(formatter)
-                        }
-                        else -> {
-                            val startHour = startTimeObj.hour
-                            val startMinute = startTimeObj.minute
-
-                            "$startHour:$startMinute"
-                        }
-                    }
-
-                    val endTimeStr = when {
-                        settings.timeFormat == "12-Hour" -> {
-                            endTimeObj.format(formatter)
-                        }
-                        else -> {
-                            val endHour = endTimeObj.hour
-                            val endMinute = endTimeObj.minute
-
-                            "$endHour:$endMinute"
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(55.dp)
-                            .padding(vertical = 8.dp)
-                            .combinedClickable(
-                                onClick = { },
-                                onLongClick = {
-                                    expandTaskOptions = timeLog.id
-                                }
-                            ),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceAround
+                    Text(
+                        text = startTimeStr,
+                        fontSize = 14.sp,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(start = 10.dp)
+                    )
+                    DropdownMenu(
+                        expanded = expandTaskOptions == timeLog.id,
+                        onDismissRequest = { expandTaskOptions = null }
                     ) {
-                        Text(
-                            text = startTimeStr,
-                            fontSize = 14.sp,
-                            color = Color.Gray,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(start = 10.dp)
-                        )
-                        DropdownMenu(
-                            expanded = expandTaskOptions == timeLog.id,
-                            onDismissRequest = { expandTaskOptions = null }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Delete") },
-                                onClick = {
-                                    viewModel.deleteLog(timeLog.id)
-                                    expandTaskOptions = null
-                                }
-                            )
-
-                            DropdownMenuItem(
-                                text = { Text("Edit") },
-                                onClick = {
-                                    val localStartTime = LocalTime.ofNanoOfDay(timeLog.startTime)
-                                    val localEndTime = LocalTime.ofNanoOfDay(timeLog.endTime)
-                                    val formatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())
-
-                                    val startTimeStr = when {
-                                        settings.timeFormat == "12-Hour" -> {
-                                            localStartTime.format(formatter)
-                                        }
-                                        else -> {
-                                            val startHour = localStartTime.hour
-                                            val startMinute = localStartTime.minute
-
-                                            "$startHour:$startMinute"
-                                        }
-                                    }
-
-                                    val endTimeStr = when {
-                                        settings.timeFormat == "12-Hour" -> {
-                                            localEndTime.format(formatter)
-                                        }
-                                        else -> {
-                                            val endHour = localEndTime.hour
-                                            val endMinute = localEndTime.minute
-
-                                            "$endHour:$endMinute"
-                                        }
-                                    }
-
-                                    tempLogId = timeLog.id
-                                    selectedStartTimeText = startTimeStr
-                                    selectedEndTimeText = endTimeStr
-                                    tempSelectedDate = timeLog.date
-
-                                    isEditingTimeLog = true
-                                }
-                            )
-
-                            DropdownMenuItem(
-                                text = { Text("Move") },
-                                onClick = {
-                                    isReordering = true
-                                    expandTaskOptions = null
-                                }
-                            )
-                        }
-
-                        Text(
-                            text = endTimeStr,
-                            fontSize = 14.sp,
-                            color = Color.Gray,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(end = 15.dp)
-                        )
-
-                        val endTime = LocalTime.ofNanoOfDay(timeLog.endTime)
-                        val startTime = LocalTime.ofNanoOfDay(timeLog.startTime)
-                        val totalTime = when {
-                            startTime.toNanoOfDay() < endTime.toNanoOfDay() -> {
-                                Duration.between(startTime, endTime).toHours()
+                        DropdownMenuItem(
+                            text = { Text("Delete") },
+                            onClick = {
+                                viewModel.deleteLog(timeLog.id)
+                                expandTaskOptions = null
                             }
-                            else -> {
-                                Duration.between(startTime, endTime).toHours() + 24
-                            }
-                        }
-                        Text(
-                            text = "${totalTime}H",
-                            fontSize = 14.sp,
-                            color = Color.Black,
-                            textAlign = TextAlign.Center
                         )
 
-                        val year = timeLog.date.substring(0, 4)
-                        val month = timeLog.date.substring(5, 7)
-                        val day = timeLog.date.substring(8, 10)
-                        Text(
-                            text = "$month/$day/$year",
-                            fontSize = 14.sp,
-                            color = Color.Gray,
-                            textAlign = TextAlign.Center
+                        DropdownMenuItem(
+                            text = { Text("Edit") },
+                            onClick = {
+                                val localStartTime = LocalTime.ofNanoOfDay(timeLog.startTime)
+                                val localEndTime = LocalTime.ofNanoOfDay(timeLog.endTime)
+                                val formatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())
+
+                                val startTimeStr = when {
+                                    settings.timeFormat == "12-Hour" -> {
+                                        localStartTime.format(formatter)
+                                    }
+                                    else -> {
+                                        val startHour = localStartTime.hour
+                                        val startMinute = localStartTime.minute
+
+                                        "$startHour:$startMinute"
+                                    }
+                                }
+
+                                val endTimeStr = when {
+                                    settings.timeFormat == "12-Hour" -> {
+                                        localEndTime.format(formatter)
+                                    }
+                                    else -> {
+                                        val endHour = localEndTime.hour
+                                        val endMinute = localEndTime.minute
+
+                                        "$endHour:$endMinute"
+                                    }
+                                }
+
+                                startTimePickerState = TimePickerState(
+                                    initialHour = localStartTime.hour,
+                                    initialMinute = localStartTime.minute,
+                                    is24Hour = when {
+                                        settings.timeFormat == "24-Hour" -> true
+                                        else -> false
+                                    }
+                                )
+
+                                endTimePickerState = TimePickerState(
+                                    initialHour = localEndTime.hour,
+                                    initialMinute = localEndTime.minute,
+                                    is24Hour = when {
+                                        settings.timeFormat == "24-Hour" -> true
+                                        else -> false
+                                    }
+                                )
+
+                                tempLogId = timeLog.id
+                                selectedStartTimeText = startTimeStr
+                                selectedEndTimeText = endTimeStr
+                                tempSelectedDate = timeLog.date
+                                longSelectedStartTime = timeLog.startTime
+                                longSelectedEndTime = timeLog.endTime
+
+                                isEditingTimeLog = true
+                            }
+                        )
+
+                        DropdownMenuItem(
+                            text = { Text("Move") },
+                            onClick = {
+                                isReordering = true
+                                expandTaskOptions = null
+                            }
                         )
                     }
 
-                    if (isReordering) {
-                        Text(
-                            text = "…\n…",
-                            fontSize = 25.sp,
-                            fontWeight = Bold,
-                            color = Color.Black,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .draggableHandle(),
-                            textAlign = TextAlign.Center
-                        )
+                    Text(
+                        text = endTimeStr,
+                        fontSize = 14.sp,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(end = 15.dp)
+                    )
+
+                    val endTime = LocalTime.ofNanoOfDay(timeLog.endTime)
+                    val startTime = LocalTime.ofNanoOfDay(timeLog.startTime)
+                    val totalTime = when {
+                        startTime.toNanoOfDay() < endTime.toNanoOfDay() -> {
+                            Duration.between(startTime, endTime).toHours()
+                        }
+                        else -> {
+                            Duration.between(startTime, endTime).toHours() + 23
+                        }
                     }
+                    Text(
+                        text = "${totalTime}H",
+                        fontSize = 14.sp,
+                        color = Color.Black,
+                        textAlign = TextAlign.Center
+                    )
+
+                    val year = timeLog.date.substring(0, 4)
+                    val month = timeLog.date.substring(5, 7)
+                    val day = timeLog.date.substring(8, 10)
+                    Text(
+                        text = "$month/$day/$year",
+                        fontSize = 14.sp,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                if (isReordering) {
+                    Text(
+                        text = "…\n…",
+                        fontSize = 25.sp,
+                        fontWeight = Bold,
+                        color = Color.Black,
+                        modifier = Modifier
+                            .fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
 
@@ -4464,7 +4484,33 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
     // add time log
     if (isAddingTimeLog) {
         Dialog(
-            onDismissRequest = { isAddingTimeLog = false }
+            onDismissRequest = {
+                tempLogId = 0
+                longSelectedStartTime = 0L
+                longSelectedEndTime = 0L
+                tempSelectedDate = "--/--/----"
+                selectedStartTimeText = "No selected time"
+                selectedEndTimeText = "No selected time"
+
+                startTimePickerState = TimePickerState(
+                    initialHour = currentTime.get(Calendar.HOUR_OF_DAY),
+                    initialMinute = currentTime.get(Calendar.MINUTE),
+                    is24Hour = when {
+                        settings.timeFormat == "24-Hour" -> true
+                        else -> false
+                    }
+                )
+                endTimePickerState = TimePickerState(
+                    initialHour = currentTime.get(Calendar.HOUR_OF_DAY),
+                    initialMinute = currentTime.get(Calendar.MINUTE),
+                    is24Hour = when {
+                        settings.timeFormat == "24-Hour" -> true
+                        else -> false
+                    }
+                )
+
+                isAddingTimeLog = false
+            }
         ) {
             DialogBoxSkeleton(
                 width = 550.dp,
@@ -4519,6 +4565,7 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
                             IconButton(
                                 modifier = Modifier.size(40.dp, 40.dp),
                                 onClick = {
+                                    endTimePickerState = startTimePickerState
                                     openEndTimePicker = true
                                 },
                                 colors = IconButtonColors(
@@ -4561,6 +4608,30 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
                     ) {
                         Button(
                             onClick = {
+                                tempLogId = 0
+                                longSelectedStartTime = 0L
+                                longSelectedEndTime = 0L
+                                tempSelectedDate = "--/--/----"
+                                selectedStartTimeText = "No selected time"
+                                selectedEndTimeText = "No selected time"
+
+                                startTimePickerState = TimePickerState(
+                                    initialHour = currentTime.get(Calendar.HOUR_OF_DAY),
+                                    initialMinute = currentTime.get(Calendar.MINUTE),
+                                    is24Hour = when {
+                                        settings.timeFormat == "24-Hour" -> true
+                                        else -> false
+                                    }
+                                )
+                                endTimePickerState = TimePickerState(
+                                    initialHour = currentTime.get(Calendar.HOUR_OF_DAY),
+                                    initialMinute = currentTime.get(Calendar.MINUTE),
+                                    is24Hour = when {
+                                        settings.timeFormat == "24-Hour" -> true
+                                        else -> false
+                                    }
+                                )
+
                                 isAddingTimeLog = false
                             },
                             colors = ButtonColors(
@@ -4591,6 +4662,25 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
                                     longSelectedStartTime = 0L
                                     longSelectedEndTime = 0L
                                     tempSelectedDate = "--/--/----"
+                                    selectedStartTimeText = "No selected time"
+                                    selectedEndTimeText = "No selected time"
+
+                                    startTimePickerState = TimePickerState(
+                                        initialHour = currentTime.get(Calendar.HOUR_OF_DAY),
+                                        initialMinute = currentTime.get(Calendar.MINUTE),
+                                        is24Hour = when {
+                                            settings.timeFormat == "24-Hour" -> true
+                                            else -> false
+                                        }
+                                    )
+                                    endTimePickerState = TimePickerState(
+                                        initialHour = currentTime.get(Calendar.HOUR_OF_DAY),
+                                        initialMinute = currentTime.get(Calendar.MINUTE),
+                                        is24Hour = when {
+                                            settings.timeFormat == "24-Hour" -> true
+                                            else -> false
+                                        }
+                                    )
 
                                     isAddingTimeLog = false
                                 } else {
@@ -4620,7 +4710,34 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
     // edit time log
     if (isEditingTimeLog) {
         Dialog(
-            onDismissRequest = { isEditingTimeLog = false }
+            onDismissRequest = {
+                tempLogId = 0
+                longSelectedStartTime = 0L
+                longSelectedEndTime = 0L
+                tempSelectedDate = "--/--/----"
+                selectedStartTimeText = "No selected time"
+                selectedEndTimeText = "No selected time"
+
+                startTimePickerState = TimePickerState(
+                    initialHour = currentTime.get(Calendar.HOUR_OF_DAY),
+                    initialMinute = currentTime.get(Calendar.MINUTE),
+                    is24Hour = when {
+                        settings.timeFormat == "24-Hour" -> true
+                        else -> false
+                    }
+                )
+                endTimePickerState = TimePickerState(
+                    initialHour = currentTime.get(Calendar.HOUR_OF_DAY),
+                    initialMinute = currentTime.get(Calendar.MINUTE),
+                    is24Hour = when {
+                        settings.timeFormat == "24-Hour" -> true
+                        else -> false
+                    }
+                )
+
+                isEditingTimeLog = false
+                expandTaskOptions = null
+            }
         ) {
             DialogBoxSkeleton(
                 width = 550.dp,
@@ -4632,7 +4749,7 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
                     verticalArrangement = Arrangement.SpaceEvenly
                 ) {
                     Text(
-                        text = "Add Time Log",
+                        text = "Edit Time Log",
                         fontSize = 25.sp,
                         fontWeight = Bold
                     )
@@ -4717,6 +4834,30 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
                     ) {
                         Button(
                             onClick = {
+                                tempLogId = 0
+                                longSelectedStartTime = 0L
+                                longSelectedEndTime = 0L
+                                tempSelectedDate = "--/--/----"
+                                selectedStartTimeText = "No selected time"
+                                selectedEndTimeText = "No selected time"
+
+                                startTimePickerState = TimePickerState(
+                                    initialHour = currentTime.get(Calendar.HOUR_OF_DAY),
+                                    initialMinute = currentTime.get(Calendar.MINUTE),
+                                    is24Hour = when {
+                                        settings.timeFormat == "24-Hour" -> true
+                                        else -> false
+                                    }
+                                )
+                                endTimePickerState = TimePickerState(
+                                    initialHour = currentTime.get(Calendar.HOUR_OF_DAY),
+                                    initialMinute = currentTime.get(Calendar.MINUTE),
+                                    is24Hour = when {
+                                        settings.timeFormat == "24-Hour" -> true
+                                        else -> false
+                                    }
+                                )
+
                                 isEditingTimeLog = false
                                 expandTaskOptions = null
                             },
@@ -4749,6 +4890,25 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
                                     longSelectedStartTime = 0L
                                     longSelectedEndTime = 0L
                                     tempSelectedDate = "--/--/----"
+                                    selectedStartTimeText = "No selected time"
+                                    selectedEndTimeText = "No selected time"
+
+                                    startTimePickerState = TimePickerState(
+                                        initialHour = currentTime.get(Calendar.HOUR_OF_DAY),
+                                        initialMinute = currentTime.get(Calendar.MINUTE),
+                                        is24Hour = when {
+                                            settings.timeFormat == "24-Hour" -> true
+                                            else -> false
+                                        }
+                                    )
+                                    endTimePickerState = TimePickerState(
+                                        initialHour = currentTime.get(Calendar.HOUR_OF_DAY),
+                                        initialMinute = currentTime.get(Calendar.MINUTE),
+                                        is24Hour = when {
+                                            settings.timeFormat == "24-Hour" -> true
+                                            else -> false
+                                        }
+                                    )
 
                                     isEditingTimeLog = false
                                     expandTaskOptions = null
@@ -4783,25 +4943,38 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
             confirmButton = {
                 Button(
                     onClick = {
-                        val amPm = if (startTimePickerState.hour >= 12) "PM" else "AM"
-                        val displayHour = when {
-                            startTimePickerState.hour == 0 -> 12
-                            startTimePickerState.hour > 12 -> startTimePickerState.hour - 12
-                            else -> startTimePickerState.hour
-                        }
-
                         val hour = startTimePickerState.hour
                         val minute = startTimePickerState.minute
 
                         longSelectedStartTime = LocalTime.of(hour, minute).toNanoOfDay()
 
-                        selectedStartTimeText = String.format(
-                            Locale.getDefault(),
-                            "%02d:%02d %s",
-                            displayHour,
-                            startTimePickerState.minute,
-                            amPm
-                        )
+                        selectedStartTimeText = when {
+                            settings.timeFormat == "12-Hour" -> {
+                                val amPm = if (startTimePickerState.hour >= 12) "PM" else "AM"
+                                val displayHour = when {
+                                    startTimePickerState.hour == 0 -> 12
+                                    startTimePickerState.hour > 12 -> startTimePickerState.hour - 12
+                                    else -> startTimePickerState.hour
+                                }
+
+                                String.format(
+                                    Locale.getDefault(),
+                                    "%02d:%02d %s",
+                                    displayHour,
+                                    startTimePickerState.minute,
+                                    amPm
+                                )
+                            }
+                            else -> {
+                                String.format(
+                                    Locale.getDefault(),
+                                    "%02d:%02d",
+                                    hour,
+                                    minute
+                                )
+                            }
+                        }
+
                         openStartTimePicker = false
                     },
                     // shape = RoundedCornerShape(8.dp),
@@ -4856,25 +5029,37 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
             confirmButton = {
                 Button(
                     onClick = {
-                        val amPm = if (endTimePickerState.hour >= 12) "PM" else "AM"
-                        val displayHour = when {
-                            endTimePickerState.hour == 0 -> 12
-                            endTimePickerState.hour > 12 -> endTimePickerState.hour - 12
-                            else -> endTimePickerState.hour
-                        }
-
                         val hour = endTimePickerState.hour
                         val minute = endTimePickerState.minute
 
                         longSelectedEndTime = LocalTime.of(hour, minute).toNanoOfDay()
 
-                        selectedEndTimeText = String.format(
-                            Locale.getDefault(),
-                            "%02d:%02d %s",
-                            displayHour,
-                            endTimePickerState.minute,
-                            amPm
-                        )
+                        selectedEndTimeText = when {
+                            settings.timeFormat == "12-Hour" -> {
+                                val amPm = if (endTimePickerState.hour >= 12) "PM" else "AM"
+                                val displayHour = when {
+                                    endTimePickerState.hour == 0 -> 12
+                                    endTimePickerState.hour > 12 -> endTimePickerState.hour - 12
+                                    else -> endTimePickerState.hour
+                                }
+
+                                String.format(
+                                    Locale.getDefault(),
+                                    "%02d:%02d %s",
+                                    displayHour,
+                                    endTimePickerState.minute,
+                                    amPm
+                                )
+                            }
+                            else -> {
+                                String.format(
+                                    Locale.getDefault(),
+                                    "%02d:%02d",
+                                    hour,
+                                    minute
+                                )
+                            }
+                        }
                         openEndTimePicker = false
                     },
                     // shape = RoundedCornerShape(8.dp),
@@ -4888,7 +5073,7 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
                     Text(
                         text = "Confirm",
                         fontWeight = Bold,
-                        fontSize = 18.sp,
+                        fontSize = 14.sp,
                         color = Color.Black
                     )
                 }
@@ -4910,7 +5095,7 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
                     Text(
                         text = "Cancel",
                         fontWeight = Bold,
-                        fontSize = 18.sp,
+                        fontSize = 14.sp,
                         color = Color.Black
                     )
                 }
@@ -5101,6 +5286,42 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
 
 @Composable
 fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
+    val client = viewModel.clientState.collectAsStateWithLifecycle().value.find { it.id == clientId }
+    val project = client?.projects?.find { it.id == projectId }
+    val items = viewModel.items.collectAsStateWithLifecycle().value
+
+    val windowInfo = LocalWindowInfo.current
+    val screenWidth = windowInfo.containerDpSize.width
+    val screenHeight = windowInfo.containerDpSize.height
+
+    var localInvoices by remember(project) { mutableStateOf(project?.invoices?: emptyList()) }
+    var localItems by remember(items) { mutableStateOf(items) }
+
+    val lazyListState = rememberLazyListState()
+    val lazyListStateTwo = rememberLazyListState()
+
+    val datePickerState = rememberDatePickerState()
+    val selectedDate = datePickerState.selectedDateMillis?.let {
+        convertMillisToDate(it)
+    } ?: ""
+
+    var tempInvoiceId by remember { mutableIntStateOf(0) }
+    var tempClientName by remember { mutableStateOf("") }
+    var tempClientEmail by remember { mutableStateOf("") }
+    var tempClientTelephone by remember { mutableStateOf("") }
+    var tempClientCompany by remember { mutableStateOf("") }
+    var tempSelfName by remember { mutableStateOf("") }
+    var tempSelfAddress by remember { mutableStateOf("") }
+    var tempSelfEmail by remember { mutableStateOf("") }
+    var tempSelfTelephone by remember { mutableStateOf("") }
+    var tempIssueDate by remember { mutableStateOf("--/--/----") }
+    var tempDueDate by remember { mutableStateOf("--/--/----") }
+    var tempTaxPercentage by remember { mutableDoubleStateOf(0.0) }
+
+    var isAddingInvoice by remember { mutableStateOf(false) }
+    var showIssueDatePicker by remember { mutableStateOf(false) }
+    var isAddingItem by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -5127,27 +5348,6 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                     fontFamily = FontFamily.SansSerif,
                     color = Color.Black
                 )
-
-                IconButton(
-                    modifier = Modifier.size(20.dp),
-                    onClick = {
-
-                    },
-                    colors = IconButtonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Black,
-                        disabledContentColor = Color.Black,
-                        disabledContainerColor = Color.White
-                    ),
-                    shape = CircleShape
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit Project Info",
-                        modifier = Modifier.size(20.dp),
-                        tint = Color.Black
-                    )
-                }
             }
 
             Row(
@@ -5212,6 +5412,539 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
         }
 
         // Begin making invoice rows
+        LazyColumn(
+            state = lazyListState
+        ) {
+            items(localInvoices, key = { invoice -> invoice.id }) { invoice ->
+                Card(
+                    elevation = CardDefaults.elevatedCardElevation(5.dp ,5.dp,5.dp,5.dp,5.dp,5.dp),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(40.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(
+
+                        ) {
+                            Text(
+                                text = invoice.issueDate,
+                                fontSize = 22.sp,
+                                fontWeight = Bold,
+                                color = Color.Black
+                            )
+
+                            Text(
+                                text = "${invoice.amount}",
+                                color = Color.Gray,
+                                fontSize = 17.sp
+                            )
+                        }
+
+                        Text(
+                            text = invoice.status,
+                            color = when(invoice.status) {
+                                InvoiceStatus.DRAFT.name -> Color.Gray
+                                InvoiceStatus.SENT.name -> Color.Yellow
+                                InvoiceStatus.PAID.name -> Color.Green
+                                else -> Color.Red
+                            },
+                            fontSize = 20.sp
+                        )
+                    }
+                }
+            }
+
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        modifier = Modifier.size(40.dp),
+                        onClick = {
+                            tempInvoiceId = localInvoices.size
+
+                            viewModel.createInvoice(
+                                projectId = projectId,
+                                invoiceNumber = "",
+                                issueDate = tempIssueDate,
+                                dueDate = tempDueDate,
+                                issueTo = tempClientName,
+                                clientCompany = tempClientCompany,
+                                clientEmail = tempClientEmail,
+                                clientTelephone = tempClientTelephone,
+                                payTo = tempSelfName,
+                                selfAddress = tempSelfAddress,
+                                selfEmail = tempSelfEmail,
+                                selfTelephone = tempSelfTelephone,
+                                taxPercentage = tempTaxPercentage
+                            )
+
+                            isAddingInvoice = true
+                        },
+                        colors = IconButtonColors(
+                            containerColor = Color.Blue,
+                            contentColor = Color.White,
+                            disabledContentColor = Color.White,
+                            disabledContainerColor = Color.Blue
+                        ),
+                        shape = CircleShape
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add Invoice",
+                            modifier = Modifier.size(23.dp),
+                            tint = Color.White
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // DIALOG BOXES
+
+    // add invoice from scratch
+    if (isAddingInvoice) {
+        Dialog(
+            onDismissRequest = {
+                viewModel.deleteInvoice(localInvoices.lastIndex)
+                isAddingInvoice = false
+            }
+        ) {
+            DialogBoxSkeleton(
+                width = screenWidth - 40.dp,
+                height = screenHeight - 100.dp
+            ) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    item {
+                        val padding = 10.dp
+
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            tint = Color.Gray,
+                            contentDescription = "GenerateInvoice",
+                            modifier = Modifier.size(30.dp)
+                        )
+
+                        Text(
+                            text = "Generate Invoice",
+                            fontSize = 25.sp,
+                            fontWeight = Bold,
+                            color = Color.Black
+                        )
+
+                        HorizontalDivider(thickness = 1.dp, color = Color.Black)
+
+                        Text(
+                            text = "Client Information",
+                            fontSize = 20.sp,
+                            fontWeight = Bold,
+                            color = Color.Black,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 17.dp),
+                            textAlign = TextAlign.Start
+                        )
+
+                        HorizontalDivider(thickness = 1.dp, color = Color.LightGray)
+
+                        OutlinedTextField(
+                            value = tempClientName,
+                            onValueChange = { text ->
+                                if (tempClientName.length < 30) {
+                                    tempClientName = text
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                            label = { Text("Client Name") },
+                            singleLine = true,
+                            modifier = Modifier.padding(vertical = padding)
+                        )
+
+                        OutlinedTextField(
+                            value = tempClientCompany,
+                            onValueChange = { text ->
+                                if (tempClientCompany.length < 30) {
+                                    tempClientCompany = text
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                            label = { Text("Client Company") },
+                            singleLine = true,
+                            modifier = Modifier.padding(vertical = padding)
+                        )
+
+                        OutlinedTextField(
+                            value = tempClientEmail,
+                            onValueChange = { text ->
+                                if (tempClientEmail.length < 30) {
+                                    tempClientEmail = text
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                            label = { Text("Client Email") },
+                            singleLine = true,
+                            modifier = Modifier.padding(vertical = padding)
+                        )
+
+                        OutlinedTextField(
+                            value = tempClientTelephone,
+                            onValueChange = { text ->
+                                if (tempClientTelephone.length < 30) {
+                                    tempClientTelephone = text
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                            label = { Text("Client Telephone") },
+                            singleLine = true,
+                            modifier = Modifier.padding(vertical = padding)
+                        )
+
+                        Text(
+                            text = "Self Information",
+                            fontSize = 20.sp,
+                            fontWeight = Bold,
+                            color = Color.Black,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 17.dp),
+                            textAlign = TextAlign.Start
+                        )
+
+                        HorizontalDivider(thickness = 1.dp, color = Color.LightGray)
+
+                        OutlinedTextField(
+                            value = tempSelfName,
+                            onValueChange = { text ->
+                                if (tempSelfName.length < 30) {
+                                    tempSelfName = text
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                            label = { Text("Name") },
+                            singleLine = true,
+                            modifier = Modifier.padding(vertical = padding)
+                        )
+
+                        OutlinedTextField(
+                            value = tempSelfAddress,
+                            onValueChange = { text ->
+                                if (tempSelfAddress.length < 30) {
+                                    tempSelfAddress = text
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                            label = { Text("Address") },
+                            singleLine = true,
+                            modifier = Modifier.padding(vertical = padding)
+                        )
+
+                        OutlinedTextField(
+                            value = tempSelfEmail,
+                            onValueChange = { text ->
+                                if (tempSelfEmail.length < 30) {
+                                    tempSelfEmail = text
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                            label = { Text("Email") },
+                            singleLine = true,
+                            modifier = Modifier.padding(vertical = padding)
+                        )
+
+                        OutlinedTextField(
+                            value = tempSelfTelephone,
+                            onValueChange = { text ->
+                                if (tempSelfTelephone.length < 30) {
+                                    tempSelfTelephone = text
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                            label = { Text("Telephone") },
+                            singleLine = true,
+                            modifier = Modifier.padding(vertical = padding)
+                        )
+
+                        Text(
+                            text = "Dates",
+                            fontSize = 20.sp,
+                            fontWeight = Bold,
+                            color = Color.Black,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 17.dp),
+                            textAlign = TextAlign.Start
+                        )
+
+                        HorizontalDivider(thickness = 1.dp, color = Color.LightGray)
+
+                        OutlinedTextField(
+                            value = tempIssueDate,
+                            onValueChange = {  },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                            label = { Text("Issue Date") },
+                            singleLine = true,
+                            readOnly = true,
+                            modifier = Modifier.padding(vertical = padding)
+                        )
+
+                        OutlinedTextField(
+                            value = tempDueDate,
+                            onValueChange = {  },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                            label = { Text("Due Date") },
+                            singleLine = true,
+                            readOnly = true,
+                            modifier = Modifier.padding(vertical = padding)
+                        )
+
+                        Text(
+                            text = "Tax Percentage",
+                            fontSize = 20.sp,
+                            fontWeight = Bold,
+                            color = Color.Black,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 17.dp),
+                            textAlign = TextAlign.Start
+                        )
+
+                        HorizontalDivider(thickness = 1.dp, color = Color.LightGray)
+
+                        OutlinedTextField(
+                            value = tempTaxPercentage.toString(),
+                            onValueChange = { text ->
+                                val isValidDecimal = text.count { it == '.' } <= 1 &&
+                                        text.all { it.isDigit() || it == '.' }
+                                if (isValidDecimal) {
+                                    tempTaxPercentage = text.toDouble()
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                            label = { Text("Tax Percentage") },
+                            singleLine = true,
+                            trailingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Percent,
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(35.dp),
+                                    contentDescription = "Tax Percentage"
+                                )
+                            },
+                            modifier = Modifier.padding(vertical = padding)
+                        )
+
+                        Text(
+                            text = "Items",
+                            fontSize = 20.sp,
+                            fontWeight = Bold,
+                            color = Color.Black,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 17.dp),
+                            textAlign = TextAlign.Start
+                        )
+
+                        HorizontalDivider(thickness = 1.dp, color = Color.LightGray)
+
+                        LazyColumn(
+                            state = lazyListStateTwo,
+                            modifier = Modifier.size(screenWidth - 40.dp, 350.dp)
+                        ) {
+                            items(localItems.filter { it.invoiceId == tempInvoiceId }) {
+                                Row() { }
+                            }
+
+                            item {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(10.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    IconButton(
+                                        modifier = Modifier.size(40.dp),
+                                        onClick = {
+                                            viewModel.createItem(
+                                                invoiceId = tempInvoiceId,
+                                                name = "",
+                                                price = 0.0,
+                                                quantity = 0
+                                            )
+
+                                            isAddingItem = true
+                                        },
+                                        colors = IconButtonColors(
+                                            containerColor = Color.Blue,
+                                            contentColor = Color.White,
+                                            disabledContentColor = Color.White,
+                                            disabledContainerColor = Color.Blue
+                                        ),
+                                        shape = CircleShape
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = "Add Invoice Item",
+                                            modifier = Modifier.size(23.dp),
+                                            tint = Color.White
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(thickness = 1.dp, color = Color.LightGray)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceAround,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Button(
+                                onClick = {
+                                    viewModel.deleteInvoice(localInvoices.lastIndex)
+                                    isAddingInvoice = false
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.Gray,
+                                    contentColor = Color.Black
+                                )
+                            ) {
+                                Text(
+                                    text = "Cancel",
+                                    fontSize = 14.sp,
+                                    fontWeight = Bold,
+                                    color = Color.Black
+                                )
+                            }
+
+                            Button(
+                                onClick = {
+
+
+                                    isAddingInvoice = false
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.Gray,
+                                    contentColor = Color.Black
+                                )
+                            ) {
+                                Text(
+                                    text = "Confirm",
+                                    fontSize = 14.sp,
+                                    fontWeight = Bold,
+                                    color = Color.Black
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // add item
+    if (isAddingItem) {
+        Dialog(
+            onDismissRequest = {
+                viewModel.deleteItem(items.lastIndex)
+
+                isAddingItem = false
+            }
+        ) {
+            DialogBoxSkeleton(
+                width = 550.dp,
+                height = 600.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Text(
+                        text = "Add Item",
+                        fontSize = 25.sp,
+                        fontWeight = Bold,
+                        color = Color.Black
+                    )
+
+
+                }
+            }
+        }
+    }
+
+    // show issue date picker
+    if (showIssueDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showIssueDatePicker = false },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        tempIssueDate = selectedDate
+                        showIssueDatePicker = false
+                    },
+                    // shape = RoundedCornerShape(8.dp),
+                    colors = ButtonColors(
+                        containerColor = Color.Cyan,
+                        contentColor = Color.Black,
+                        disabledContainerColor = Color.Cyan,
+                        disabledContentColor = Color.Black
+                    ),
+                    modifier = Modifier.padding(horizontal = 35.dp)
+                ) {
+                    Text(
+                        text = "Confirm",
+                        fontWeight = Bold,
+                        fontSize = 18.sp,
+                        color = Color.Black
+                    )
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = {
+                        showIssueDatePicker = false
+                    },
+                    // shape = RoundedCornerShape(8.dp),
+                    colors = ButtonColors(
+                        containerColor = Color.LightGray,
+                        contentColor = Color.Black,
+                        disabledContainerColor = Color.LightGray,
+                        disabledContentColor = Color.Black
+                    ),
+                    modifier = Modifier.padding(end = 20.dp)
+                ) {
+                    Text(
+                        text = "Cancel",
+                        fontWeight = Bold,
+                        fontSize = 18.sp,
+                        color = Color.Black
+                    )
+                }
+            }
+        ) {
+            DatePicker(
+                state = datePickerState,
+                showModeToggle = false
+            )
+        }
     }
 }
 

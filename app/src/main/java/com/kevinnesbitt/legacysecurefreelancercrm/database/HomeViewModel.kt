@@ -1,6 +1,15 @@
 package com.kevinnesbitt.legacysecurefreelancercrm.database
 
 import android.app.Application
+import android.content.ClipData
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
+import android.graphics.pdf.PdfDocument
+import android.net.Uri
+import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -9,10 +18,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
+import java.text.DecimalFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import java.util.Locale
+import android.graphics.*
+import android.os.Build
+import androidx.compose.runtime.State
+import kotlinx.coroutines.flow.map
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -91,8 +107,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                                         amount = invoice.amount,
                                         issueDate = invoice.issueDate,
                                         dueDate = invoice.issueDate,
+                                        issueTo = invoice.issueTo,
+                                        clientCompany = invoice.clientCompany,
+                                        clientEmail = invoice.clientEmail,
+                                        clientTelephone = invoice.clientTelephone,
+                                        payTo = invoice.payTo,
+                                        selfAddress = invoice.selfAddress,
+                                        selfEmail = invoice.selfEmail,
+                                        selfTelephone = invoice.selfTelephone,
                                         status = invoice.status,
-                                        taxPercentage = invoice.taxPercentage
+                                        taxPercentage = invoice.taxPercentage,
+                                        items = emptyList()
                                     )
                                 }
                         )
@@ -158,6 +183,24 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         started = SharingStarted.WhileSubscribed(5000), // Clean resource loop on activity teardowns
         initialValue = DashboardUiState(isLoading = true)
     )
+
+    val items: StateFlow<List<ItemData>> = dao.getAllInvoiceItems().map { invoiceItems ->
+        invoiceItems.map { item ->
+            ItemData(
+                id = item.id,
+                invoiceId = item.invoiceId,
+                name = item.name,
+                quantity = item.quantity,
+                price = item.price
+            )
+        }
+    }
+
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000), // Clean resource loop on activity teardowns
+            initialValue = emptyList()
+        )
 
     // ==========================================
     // USER ACTIONS & INTENTS (Database Writes)
@@ -237,6 +280,79 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     orderIndex = currentTimeLogsCount
                 )
             )
+        }
+    }
+
+    fun createInvoice(
+        projectId: Int,
+        invoiceNumber: String,
+        issueDate: String,
+        dueDate: String,
+        issueTo: String,
+        clientCompany: String,
+        clientEmail: String,
+        clientTelephone: String,
+        payTo: String,
+        selfAddress: String,
+        selfEmail: String,
+        selfTelephone: String,
+        taxPercentage: Double
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.insertInvoice(
+                InvoiceEntity(
+                    id = 0,
+                    projectId = projectId,
+                    invoiceNumber = invoiceNumber,
+                    issueDate = issueDate,
+                    dueDate = dueDate,
+                    issueTo = issueTo,
+                    clientCompany = clientCompany,
+                    clientEmail = clientEmail,
+                    clientTelephone = clientTelephone,
+                    payTo = payTo,
+                    selfAddress = selfAddress,
+                    selfEmail = selfEmail,
+                    selfTelephone = selfTelephone,
+                    taxPercentage = taxPercentage
+                )
+            )
+        }
+    }
+
+    fun updateInvoice(invoiceNumber: String, issueDate: String, dueDate: String, issueTo: String, clientCompany: String, clientEmail: String, clientTelephone: String, payTo: String, selfAddress: String, selfEmail: String, selfTelephone: String, taxPercentage: Double, amount: Double, status: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.updateInvoice(invoiceNumber, issueDate, dueDate, issueTo, clientCompany, clientEmail, clientTelephone, payTo, selfAddress, selfEmail, selfTelephone, taxPercentage, amount, status)
+        }
+    }
+
+    fun deleteInvoice(invoiceId: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.deleteInvoice(invoiceId)
+        }
+    }
+
+    fun createItem(invoiceId: Int, name: String, price: Double, quantity: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            ItemEntity(
+                id = 0,
+                invoiceId = invoiceId,
+                name = name,
+                price = price,
+                quantity = quantity
+            )
+        }
+    }
+
+    fun deleteItem(itemId: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.deleteItem(itemId)
+        }
+    }
+
+    fun updateItem(itemId: Int, name: String, price: Double, quantity: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.updateItem(itemId, name, price, quantity)
         }
     }
 
@@ -432,6 +548,228 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+// ─── Data Models ─────────────────────────────────────────────
+
+    data class InvoiceItem(
+        val description: String,
+        val unitPrice: Double,
+        val quantity: Int
+    )
+
+// ─── PDF Generator ───────────────────────────────────────────
+
+    object InvoicePdfGenerator {
+
+        private const val PAGE_WIDTH = 595f
+        private const val PAGE_HEIGHT = 842f
+        private const val MARGIN_LEFT = 55f
+        private const val MARGIN_RIGHT = 540f
+
+        /**
+         * @param signatureText Optional handwritten-style signature at the bottom.
+         */
+        fun generate(
+            context: Context,
+            invoice: InvoiceData,
+            signatureText: String? = null,
+            fileName: String = "invoice_${invoice.invoiceNumber}.pdf"
+        ): Uri {
+            val document = PdfDocument()
+            val pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH.toInt(), PAGE_HEIGHT.toInt(), 1).create()
+            val page = document.startPage(pageInfo)
+            val canvas = page.canvas
+
+            drawInvoice(canvas, invoice, signatureText)
+
+            document.finishPage(page)
+
+            val file = File(context.cacheDir, fileName)
+            FileOutputStream(file).use { document.writeTo(it) }
+            document.close()
+
+            return FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
+        }
+
+        private fun drawInvoice(canvas: Canvas, invoice: InvoiceData, signatureText: String?) {
+            val thinLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.BLACK
+                strokeWidth = 0.8f
+                style = Paint.Style.STROKE
+            }
+
+            val boldLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.BLACK
+                strokeWidth = 1.2f
+                style = Paint.Style.STROKE
+            }
+
+            val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.BLACK
+                textSize = 26f
+                typeface = Typeface.DEFAULT_BOLD
+                letterSpacing = 0.2f
+            }
+
+            val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.BLACK
+                textSize = 9f
+                typeface = Typeface.DEFAULT_BOLD
+                letterSpacing = 0.08f
+            }
+
+            val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.BLACK
+                textSize = 9.5f
+                typeface = Typeface.DEFAULT
+            }
+
+            val moneyFormat = DecimalFormat("$#,##0.00")
+            val percentFormat = DecimalFormat("0")
+
+            var y = 85f
+
+            // ═══════════════════════════════════════════════════════
+            // HEADER
+            // ═══════════════════════════════════════════════════════
+            canvas.drawLine(MARGIN_LEFT, y, 310f, y, thinLinePaint)
+            canvas.drawText("INVOICE", 330f, y + 8f, titlePaint)
+
+            y += 70f
+
+            // ═══════════════════════════════════════════════════════
+            // METADATA BLOCKS
+            // ═══════════════════════════════════════════════════════
+            val leftColX = MARGIN_LEFT
+            val rightColX = 380f
+            var leftY = y
+            var rightY = y
+
+            // ── Left: Issued To ──
+            canvas.drawText("ISSUED TO:", leftColX, leftY, labelPaint)
+            leftY += 14f
+            canvas.drawText(invoice.issueTo, leftColX, leftY, bodyPaint)
+            leftY += 12f
+            canvas.drawText(invoice.clientCompany, leftColX, leftY, bodyPaint)
+            leftY += 12f
+            canvas.drawText(invoice.clientEmail, leftColX, leftY, bodyPaint)
+            leftY += 12f
+            canvas.drawText(invoice.clientTelephone, leftColX, leftY, bodyPaint)
+
+            // ── Left: Pay To ──
+            leftY += 26f
+            canvas.drawText("PAY TO:", leftColX, leftY, labelPaint)
+            leftY += 14f
+            canvas.drawText(invoice.payTo, leftColX, leftY, bodyPaint)
+            leftY += 12f
+            canvas.drawText(invoice.selfAddress, leftColX, leftY, bodyPaint)
+            leftY += 12f
+            canvas.drawText(invoice.selfEmail, leftColX, leftY, bodyPaint)
+            leftY += 12f
+            canvas.drawText(invoice.selfTelephone, leftColX, leftY, bodyPaint)
+
+            // ── Right: Invoice Details ──
+            val detailLabelX = rightColX
+            val detailValueX = rightColX + 85f
+
+            canvas.drawText("INVOICE NO:", detailLabelX, rightY, labelPaint)
+            drawRightAlignedText(canvas, invoice.invoiceNumber, detailValueX + 70f, rightY, bodyPaint)
+            rightY += 14f
+
+            canvas.drawText("DATE:", detailLabelX, rightY, labelPaint)
+            drawRightAlignedText(canvas, invoice.issueDate, detailValueX + 70f, rightY, bodyPaint)
+            rightY += 14f
+
+            canvas.drawText("DUE DATE:", detailLabelX, rightY, labelPaint)
+            drawRightAlignedText(canvas, invoice.dueDate, detailValueX + 70f, rightY, bodyPaint)
+
+            y = maxOf(leftY, rightY) + 55f
+
+            // ═══════════════════════════════════════════════════════
+            // ITEMS TABLE
+            // ═══════════════════════════════════════════════════════
+            val tableTop = y
+            val descX = MARGIN_LEFT
+            val priceX = 330f
+            val qtyX = 405f
+            val totalX = MARGIN_RIGHT
+
+            canvas.drawLine(MARGIN_LEFT, tableTop, MARGIN_RIGHT, tableTop, boldLinePaint)
+
+            y = tableTop + 18f
+            canvas.drawText("DESCRIPTION", descX, y, labelPaint)
+            drawRightAlignedText(canvas, "UNIT PRICE", priceX + 40f, y, labelPaint)
+            drawRightAlignedText(canvas, "QTY", qtyX + 10f, y, labelPaint)
+            drawRightAlignedText(canvas, "TOTAL", totalX, y, labelPaint)
+
+            y += 8f
+            canvas.drawLine(MARGIN_LEFT, y, MARGIN_RIGHT, y, thinLinePaint)
+            y += 18f
+
+            var subtotal = 0.0
+            invoice.items.forEach { item ->
+                val lineTotal = item.price * item.quantity
+                subtotal += lineTotal
+
+                canvas.drawText(item.name, descX, y, bodyPaint)
+                drawRightAlignedText(canvas, moneyFormat.format(item.price), priceX + 40f, y, bodyPaint)
+                drawRightAlignedText(canvas, item.quantity.toString(), qtyX + 10f, y, bodyPaint)
+                drawRightAlignedText(canvas, moneyFormat.format(lineTotal), totalX, y, bodyPaint)
+
+                y += 16f
+            }
+
+            y += 4f
+            canvas.drawLine(MARGIN_LEFT, y, MARGIN_RIGHT, y, boldLinePaint)
+            y += 20f
+
+            // ═══════════════════════════════════════════════════════
+            // TOTALS
+            // ═══════════════════════════════════════════════════════
+            val taxAmount = subtotal * (invoice.taxPercentage / 100.0)
+            val grandTotal = subtotal + taxAmount
+
+            val totalsLabelX = 420f
+            val totalsValueX = MARGIN_RIGHT
+
+            canvas.drawText("SUBTOTAL", totalsLabelX, y, labelPaint)
+            drawRightAlignedText(canvas, moneyFormat.format(subtotal), totalsValueX, y, bodyPaint)
+            y += 14f
+
+            canvas.drawText("Tax", totalsLabelX, y, bodyPaint)
+            drawRightAlignedText(canvas, "${percentFormat.format(invoice.taxPercentage)}%", totalsValueX, y, bodyPaint)
+            y += 16f
+
+            canvas.drawText("TOTAL", totalsLabelX, y, labelPaint)
+            drawRightAlignedText(canvas, moneyFormat.format(grandTotal), totalsValueX, y, labelPaint)
+
+            // ═══════════════════════════════════════════════════════
+            // SIGNATURE (optional)
+            // ═══════════════════════════════════════════════════════
+            signatureText?.let { sig ->
+                y += 70f
+                val sigPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.BLACK
+                    textSize = 22f
+                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.ITALIC)
+                }
+                val path = Path().apply {
+                    moveTo(MARGIN_LEFT + 180f, y)
+                    quadTo(MARGIN_LEFT + 260f, y - 10f, MARGIN_LEFT + 340f, y + 5f)
+                }
+                canvas.drawTextOnPath(sig, path, 0f, 0f, sigPaint)
+            }
+        }
+
+        private fun drawRightAlignedText(canvas: Canvas, text: String, x: Float, y: Float, paint: Paint) {
+            val width = paint.measureText(text)
+            canvas.drawText(text, x - width, y, paint)
+        }
+    }
+
     data class DashboardUiState(
         val isLoading: Boolean = true,
 
@@ -500,7 +838,24 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val amount: Double,
         val issueDate: String,
         val dueDate: String,
+        val issueTo: String,
+        val clientCompany: String,
+        val clientEmail: String,
+        val clientTelephone: String,
+        val payTo: String,
+        val selfAddress: String,
+        val selfEmail: String,
+        val selfTelephone: String,
         val status: String,
-        val taxPercentage: Double
+        val taxPercentage: Double,
+        val items: List<ItemData>
+    )
+
+    data class ItemData(
+        val id: Int,
+        val invoiceId: Int,
+        val name: String,
+        val price: Double,
+        val quantity: Int
     )
 }

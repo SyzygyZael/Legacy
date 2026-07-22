@@ -2,7 +2,7 @@ package com.kevinnesbitt.legacysecurefreelancercrm.variables
 
 enum class InvoiceStatus {
     DRAFT,
-    SEND,
+    SENT,
     PAID,
     OVERDUE
 }
