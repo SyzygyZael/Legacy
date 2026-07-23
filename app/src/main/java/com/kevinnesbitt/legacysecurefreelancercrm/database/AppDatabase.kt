@@ -102,7 +102,11 @@ data class SettingsEntity(
     val mainTextColor: Long = 0xFF000000L,
     val isTiming: Boolean = false,
     // val isPaused: Boolean = false,
-    val timeFormat: String = "12-Hour"
+    val timeFormat: String = "12-Hour",
+    val selfName: String = "",
+    val selfAddress: String = "",
+    val selfEmail: String = "",
+    val selfTelephone: String = ""
 )
 
 @Dao
@@ -194,8 +198,10 @@ interface AppDao {
     @Query("UPDATE invoice_item SET name = :name, price = :price, quantity = :quantity WHERE id = :itemId")
     suspend fun updateItem(itemId: Int, name: String, price: Double, quantity: Int)
 
-    @Query("UPDATE invoices SET invoiceNumber = :invoiceNumber, issueDate = :issueDate, dueDate = :dueDate, issueTo = :issueTo, clientCompany = :clientCompany, clientEmail = :clientEmail, clientTelephone = :clientTelephone, payTo = :payTo, selfAddress = :selfAddress, selfEmail = :selfEmail, selfTelephone = :selfTelephone, taxPercentage = :taxPercentage, amount = :amount, status = :status")
-    suspend fun updateInvoice(invoiceNumber: String, issueDate: String, dueDate: String, issueTo: String, clientCompany: String, clientEmail: String, clientTelephone: String, payTo: String, selfAddress: String, selfEmail: String, selfTelephone: String, taxPercentage: Double, amount: Double, status: String)
+    @Query("UPDATE invoices SET invoiceNumber = :invoiceNumber, issueDate = :issueDate, dueDate = :dueDate, issueTo = :issueTo, clientCompany = :clientCompany, clientEmail = :clientEmail, clientTelephone = :clientTelephone, payTo = :payTo, selfAddress = :selfAddress, selfEmail = :selfEmail, selfTelephone = :selfTelephone, taxPercentage = :taxPercentage, amount = :amount, status = :status WHERE id = :invoiceId")
+    suspend fun updateInvoice(invoiceId: Int, invoiceNumber: String, issueDate: String, dueDate: String, issueTo: String, clientCompany: String, clientEmail: String, clientTelephone: String, payTo: String, selfAddress: String, selfEmail: String, selfTelephone: String, taxPercentage: Double, amount: Double, status: String) {
+        android.util.Log.d("Database Dates $invoiceId", "Issue Date: $issueDate, Due Date: $dueDate")
+    }
 
     @Query("UPDATE settings SET timeFormat = :timeFormat WHERE id = 1")
     suspend fun updateSettings(timeFormat: String)
@@ -260,7 +266,7 @@ interface AppDao {
         ItemEntity::class,
         SettingsEntity::class
                          ],
-        version = 23
+        version = 26
     )
     abstract class AppDatabase : RoomDatabase() {
         abstract fun appDao(): AppDao

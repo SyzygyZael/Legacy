@@ -29,6 +29,7 @@ import android.graphics.*
 import android.os.Build
 import androidx.compose.runtime.State
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -106,7 +107,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                                         invoiceNumber = invoice.invoiceNumber,
                                         amount = invoice.amount,
                                         issueDate = invoice.issueDate,
-                                        dueDate = invoice.issueDate,
+                                        dueDate = invoice.dueDate,
                                         issueTo = invoice.issueTo,
                                         clientCompany = invoice.clientCompany,
                                         clientEmail = invoice.clientEmail,
@@ -283,7 +284,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun createInvoice(
+    suspend fun createInvoice(
         projectId: Int,
         invoiceNumber: String,
         issueDate: String,
@@ -297,8 +298,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         selfEmail: String,
         selfTelephone: String,
         taxPercentage: Double
-    ) {
-        viewModelScope.launch(Dispatchers.IO) {
+    ): Long {
+        return withContext(Dispatchers.IO) {
             dao.insertInvoice(
                 InvoiceEntity(
                     id = 0,
@@ -320,9 +321,43 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun updateInvoice(invoiceNumber: String, issueDate: String, dueDate: String, issueTo: String, clientCompany: String, clientEmail: String, clientTelephone: String, payTo: String, selfAddress: String, selfEmail: String, selfTelephone: String, taxPercentage: Double, amount: Double, status: String) {
+    fun updateInvoice(
+        invoiceId: Int,
+        invoiceNumber: String,
+        issueDate: String,
+        dueDate: String,
+        issueTo: String,
+        clientCompany: String,
+        clientEmail: String,
+        clientTelephone: String,
+        payTo: String,
+        selfAddress: String,
+        selfEmail: String,
+        selfTelephone: String,
+        taxPercentage: Double,
+        amount: Double,
+        status: String
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
-            dao.updateInvoice(invoiceNumber, issueDate, dueDate, issueTo, clientCompany, clientEmail, clientTelephone, payTo, selfAddress, selfEmail, selfTelephone, taxPercentage, amount, status)
+            android.util.Log.d("HomeViewModel Dates $invoiceId", "Issue Date: $issueDate, Due Date: $dueDate")
+
+            dao.updateInvoice(
+                invoiceId = invoiceId,
+                invoiceNumber = invoiceNumber,
+                issueDate = issueDate,
+                dueDate = dueDate,
+                issueTo = issueTo,
+                clientCompany = clientCompany,
+                clientEmail = clientEmail,
+                clientTelephone = clientTelephone,
+                payTo = payTo,
+                selfAddress = selfAddress,
+                selfEmail = selfEmail,
+                selfTelephone = selfTelephone,
+                taxPercentage = taxPercentage,
+                amount = amount,
+                status = status
+            )
         }
     }
 
@@ -332,14 +367,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun createItem(invoiceId: Int, name: String, price: Double, quantity: Int) {
-        viewModelScope.launch(Dispatchers.IO) {
-            ItemEntity(
-                id = 0,
-                invoiceId = invoiceId,
-                name = name,
-                price = price,
-                quantity = quantity
+    suspend fun createItem(invoiceId: Int, name: String, price: Double, quantity: Int): Long {
+        return withContext(Dispatchers.IO) {
+            dao.insertItem(
+                ItemEntity(
+                    id = 0,
+                    invoiceId = invoiceId,
+                    name = name,
+                    price = price,
+                    quantity = quantity
+                )
             )
         }
     }
@@ -547,14 +584,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             dao.updateTimeLogDate(timeLogId, date)
         }
     }
-
-// ─── Data Models ─────────────────────────────────────────────
-
-    data class InvoiceItem(
-        val description: String,
-        val unitPrice: Double,
-        val quantity: Int
-    )
 
 // ─── PDF Generator ───────────────────────────────────────────
 
@@ -769,6 +798,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             canvas.drawText(text, x - width, y, paint)
         }
     }
+
+    // ─── Data Models ─────────────────────────────────────────────
 
     data class DashboardUiState(
         val isLoading: Boolean = true,

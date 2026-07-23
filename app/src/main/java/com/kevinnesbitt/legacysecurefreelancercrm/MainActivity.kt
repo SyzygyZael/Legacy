@@ -1,7 +1,9 @@
 package com.kevinnesbitt.legacysecurefreelancercrm
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
-import android.widget.Button
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -24,7 +26,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsEndWidth
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -89,6 +91,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -129,6 +132,7 @@ import com.kevinnesbitt.legacysecurefreelancercrm.variables.InvoiceStatus
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.ProjectStatus
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.SupportedCurrency
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.text.SimpleDateFormat
@@ -2484,7 +2488,7 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                                     tempProjectBillingType = ""
                                     isAddingProject = false
 
-                                    android.util.Log.d("Project Added", "Num Projects: ${clientProjects.size}")
+                                    // android.util.Log.d("Project Added", "Num Projects: ${clientProjects.size}")
                                 }
                             },
                             colors = ButtonColors(
@@ -5286,30 +5290,51 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
 
 @Composable
 fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+
     val client = viewModel.clientState.collectAsStateWithLifecycle().value.find { it.id == clientId }
     val project = client?.projects?.find { it.id == projectId }
-    val items = viewModel.items.collectAsStateWithLifecycle().value
+    val items by viewModel.items.collectAsStateWithLifecycle()
 
     val windowInfo = LocalWindowInfo.current
     val screenWidth = windowInfo.containerDpSize.width
     val screenHeight = windowInfo.containerDpSize.height
 
     var localInvoices by remember(project) { mutableStateOf(project?.invoices?: emptyList()) }
-    var localItems by remember(items) { mutableStateOf(items) }
 
     val lazyListState = rememberLazyListState()
     val lazyListStateTwo = rememberLazyListState()
 
-    val datePickerState = rememberDatePickerState()
-    val selectedDate = datePickerState.selectedDateMillis?.let {
+    val issueDatePickerState = rememberDatePickerState()
+    val selectedIssueDate = issueDatePickerState.selectedDateMillis?.let {
         convertMillisToDate(it)
     } ?: ""
 
+    val dueDatePickerState = rememberDatePickerState()
+    val selectedDueDate = dueDatePickerState.selectedDateMillis?.let {
+        convertMillisToDate(it)
+    } ?: ""
+
+    val currencySymbol = when(client?.currency?: "Unknown") {
+        "USD" -> "$"
+        "EUR" -> "€"
+        "GBP" -> "£"
+        "CAD" -> "$"
+        "AUD" -> "$"
+        "INR" -> "₹"
+        "PHP" -> "₱"
+        "BRL" -> "R$"
+        "JPY" -> "¥"
+        "CHF" -> "CHF"
+        else -> "N/A"
+    }
+
     var tempInvoiceId by remember { mutableIntStateOf(0) }
-    var tempClientName by remember { mutableStateOf("") }
-    var tempClientEmail by remember { mutableStateOf("") }
-    var tempClientTelephone by remember { mutableStateOf("") }
-    var tempClientCompany by remember { mutableStateOf("") }
+    var tempClientName by remember(client) { mutableStateOf(client?.name?: "") }
+    var tempClientEmail by remember(client) { mutableStateOf(client?.email?: "") }
+    var tempClientTelephone by remember(client) { mutableStateOf(client?.telp?: "") }
+    var tempClientCompanyORAddress by remember { mutableStateOf("") }
     var tempSelfName by remember { mutableStateOf("") }
     var tempSelfAddress by remember { mutableStateOf("") }
     var tempSelfEmail by remember { mutableStateOf("") }
@@ -5318,9 +5343,26 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
     var tempDueDate by remember { mutableStateOf("--/--/----") }
     var tempTaxPercentage by remember { mutableDoubleStateOf(0.0) }
 
+    var tempItemId by remember { mutableIntStateOf(0) }
+    var tempItemName by remember { mutableStateOf("") }
+    var tempPrice by remember { mutableDoubleStateOf(0.0) }
+    var tempQuantity by remember { mutableIntStateOf(0) }
+
+    var expandInvoiceOptions by remember { mutableStateOf<Int?>(null) }
+    var expandItemOptions by remember { mutableStateOf<Int?>(null) }
+
     var isAddingInvoice by remember { mutableStateOf(false) }
+    var isEditingInvoice by remember { mutableStateOf(false) }
     var showIssueDatePicker by remember { mutableStateOf(false) }
+    var showDueDatePicker by remember { mutableStateOf(false) }
     var isAddingItem by remember { mutableStateOf(false) }
+    var showNameLengthWarningDialog by remember { mutableStateOf(false) }
+    var editProfileInfo by remember { mutableStateOf(false) }
+
+    val invoiceItems = items.filter { it.invoiceId == tempInvoiceId }
+
+    android.util.Log.d("Items List", "Items: $invoiceItems")
+    android.util.Log.d("Invoice Id in LazyColumn", "tempInvoiceId: $tempInvoiceId")
 
     Column(
         modifier = Modifier
@@ -5338,7 +5380,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                     .fillMaxWidth()
                     .background(color = Color.White)
                     .padding(8.dp),
-                horizontalArrangement = Arrangement.Start,
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -5348,6 +5390,21 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                     fontFamily = FontFamily.SansSerif,
                     color = Color.Black
                 )
+
+                Button(
+                    onClick = { editProfileInfo = true },
+                    colors = ButtonDefaults.buttonColors(
+                        contentColor = Color.Black,
+                        containerColor = Color.White
+                    )
+                ) {
+                    Text(
+                        text = "Profile",
+                        fontSize = 18.sp,
+                        fontWeight = Bold,
+                        color = Color.Black
+                    )
+                }
             }
 
             Row(
@@ -5418,17 +5475,28 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
             items(localInvoices, key = { invoice -> invoice.id }) { invoice ->
                 Card(
                     elevation = CardDefaults.elevatedCardElevation(5.dp ,5.dp,5.dp,5.dp,5.dp,5.dp),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.padding(8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White
+                    )
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(40.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .height(60.dp)
+                            .padding(8.dp)
+                            .background(color = Color.White)
+                            .combinedClickable(
+                                onClick = { },
+                                onLongClick = {
+                                    expandInvoiceOptions = invoice.id
+                                }
+                            ),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(
-
-                        ) {
+                        Column {
                             Text(
                                 text = invoice.issueDate,
                                 fontSize = 22.sp,
@@ -5454,6 +5522,66 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                             fontSize = 20.sp
                         )
                     }
+
+                    DropdownMenu(
+                        expanded = expandInvoiceOptions == invoice.id,
+                        onDismissRequest = { expandInvoiceOptions = null }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Generate PDF") },
+                            onClick = {
+                                android.util.Log.d("Dates", "Issue Date: ${invoice.issueDate}, Due Date: ${invoice.dueDate}")
+
+                                val invoice = localInvoices.find { it.id == invoice.id }?: HomeViewModel.InvoiceData(
+                                    0, 0, "", 0.0, "", "", "", "", "", "", "", "", "", "", "", 0.0, emptyList()
+                                )
+
+                                val uri = HomeViewModel.InvoicePdfGenerator.generate(
+                                    context = context,
+                                    invoice = invoice.copy(items = invoiceItems),
+                                    signatureText = invoice.payTo // or null if you don't want a signature
+                                )
+
+                                sharePdf(context, uri)
+
+                                expandInvoiceOptions = null
+                            }
+                        )
+
+                        DropdownMenuItem(
+                            text = { Text("Edit") },
+                            onClick = {
+                                android.util.Log.d("Edit Dates ${invoice.id}", "Issue Date: ${invoice.issueDate}, Due Date: ${invoice.dueDate}")
+
+                                tempInvoiceId = invoice.id
+                                tempIssueDate = invoice.issueDate
+                                tempDueDate = invoice.dueDate
+                                tempClientName = invoice.issueTo
+                                tempClientCompanyORAddress = invoice.clientCompany
+                                tempClientEmail = invoice.clientEmail
+                                tempClientTelephone = invoice.clientTelephone
+                                tempSelfName = invoice.payTo
+                                tempSelfAddress = invoice.selfAddress
+                                tempSelfEmail = invoice.selfEmail
+                                tempSelfTelephone = invoice.selfTelephone
+                                tempTaxPercentage = invoice.taxPercentage
+
+                                isAddingInvoice = true
+                                isEditingInvoice = true
+                                expandInvoiceOptions = null
+                            }
+                        )
+
+                        DropdownMenuItem(
+                            text = { Text("Delete") },
+                            onClick = {
+                                // android.util.Log.d("Invoice Id Comparison", "invoice.id: ${invoice.id}, tempInvoiceId: $tempInvoiceId")
+
+                                viewModel.deleteInvoice(invoice.id)
+                                expandInvoiceOptions = null
+                            }
+                        )
+                    }
                 }
             }
 
@@ -5468,25 +5596,32 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                     IconButton(
                         modifier = Modifier.size(40.dp),
                         onClick = {
-                            tempInvoiceId = localInvoices.size
+                            coroutineScope.launch {
+                                val newInvoiceId = viewModel.createInvoice(
+                                    projectId = projectId,
+                                    invoiceNumber = "",
+                                    issueDate = tempIssueDate,
+                                    dueDate = tempDueDate,
+                                    issueTo = tempClientName,
+                                    clientCompany = tempClientCompanyORAddress,
+                                    clientEmail = tempClientEmail,
+                                    clientTelephone = tempClientTelephone,
+                                    payTo = tempSelfName,
+                                    selfAddress = tempSelfAddress,
+                                    selfEmail = tempSelfEmail,
+                                    selfTelephone = tempSelfTelephone,
+                                    taxPercentage = tempTaxPercentage
+                                ).toInt()
 
-                            viewModel.createInvoice(
-                                projectId = projectId,
-                                invoiceNumber = "",
-                                issueDate = tempIssueDate,
-                                dueDate = tempDueDate,
-                                issueTo = tempClientName,
-                                clientCompany = tempClientCompany,
-                                clientEmail = tempClientEmail,
-                                clientTelephone = tempClientTelephone,
-                                payTo = tempSelfName,
-                                selfAddress = tempSelfAddress,
-                                selfEmail = tempSelfEmail,
-                                selfTelephone = tempSelfTelephone,
-                                taxPercentage = tempTaxPercentage
-                            )
+                                tempInvoiceId = newInvoiceId
 
-                            isAddingInvoice = true
+                                android.util.Log.d(
+                                    "Invoice Id On Init Invoice Create",
+                                    "tempInvoiceId: $tempInvoiceId"
+                                )
+
+                                isAddingInvoice = true
+                            }
                         },
                         colors = IconButtonColors(
                             containerColor = Color.Blue,
@@ -5512,12 +5647,32 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
 
     // add invoice from scratch
     if (isAddingInvoice) {
+        // LaunchedEffect(tempIssueDate, tempDueDate) {
+        //     convertDateToMillis(tempIssueDate)?.let {
+        //         issueDatePickerState.selectedDateMillis = it
+        //     }
+        //     convertDateToMillis(tempDueDate)?.let {
+        //         dueDatePickerState.selectedDateMillis = it
+        //     }
+        // }
+
         Dialog(
             onDismissRequest = {
-                viewModel.deleteInvoice(localInvoices.lastIndex)
+                // android.util.Log.d("Invoice Id Comparison", "tempInvoiceId: $tempInvoiceId, Last Invoice Id: ${localInvoices.lastIndex}")
+
+                if (!isEditingInvoice) {
+                    viewModel.deleteInvoice(tempInvoiceId)
+                }
+                // tempInvoiceId = 0
+
+                // android.util.Log.d("Invoice Id Comparison", "tempInvoiceId: $tempInvoiceId, Last Invoice Id: ${localInvoices.lastIndex}")
+
+                isEditingInvoice = false
                 isAddingInvoice = false
             }
         ) {
+            android.util.Log.d("Enter Add Invoice Id", "tempInvoiceId: $tempInvoiceId")
+
             DialogBoxSkeleton(
                 width = screenWidth - 40.dp,
                 height = screenHeight - 100.dp
@@ -5564,53 +5719,54 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                         OutlinedTextField(
                             value = tempClientName,
                             onValueChange = { text ->
-                                if (tempClientName.length < 30) {
+                                if (tempClientName.length < 50) {
                                     tempClientName = text
                                 }
                             },
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                             label = { Text("Client Name") },
                             singleLine = true,
-                            modifier = Modifier.padding(vertical = padding)
+                            modifier = Modifier.padding(all = padding)
                         )
 
                         OutlinedTextField(
-                            value = tempClientCompany,
+                            value = tempClientCompanyORAddress,
                             onValueChange = { text ->
-                                if (tempClientCompany.length < 30) {
-                                    tempClientCompany = text
-                                }
+                                tempClientCompanyORAddress = text
                             },
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                            label = { Text("Client Company") },
+                            label = { Text("Client Company or Address") },
                             singleLine = true,
-                            modifier = Modifier.padding(vertical = padding)
+                            modifier = Modifier.padding(all = padding)
                         )
 
                         OutlinedTextField(
                             value = tempClientEmail,
                             onValueChange = { text ->
-                                if (tempClientEmail.length < 30) {
-                                    tempClientEmail = text
-                                }
+                                tempClientEmail = text
                             },
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                             label = { Text("Client Email") },
                             singleLine = true,
-                            modifier = Modifier.padding(vertical = padding)
+                            modifier = Modifier.padding(all = padding)
                         )
 
                         OutlinedTextField(
                             value = tempClientTelephone,
                             onValueChange = { text ->
-                                if (tempClientTelephone.length < 30) {
+                                val isValidDecimal = text.count { it == '+' } <= 1 &&
+                                        text.all { it.isDigit() || it == '+' }
+                                if (isValidDecimal) {
                                     tempClientTelephone = text
                                 }
                             },
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Next,
+                                keyboardType = KeyboardType.Number
+                            ),
                             label = { Text("Client Telephone") },
                             singleLine = true,
-                            modifier = Modifier.padding(vertical = padding)
+                            modifier = Modifier.padding(all = padding)
                         )
 
                         Text(
@@ -5629,53 +5785,54 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                         OutlinedTextField(
                             value = tempSelfName,
                             onValueChange = { text ->
-                                if (tempSelfName.length < 30) {
+                                if (tempSelfName.length < 50) {
                                     tempSelfName = text
                                 }
                             },
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                             label = { Text("Name") },
                             singleLine = true,
-                            modifier = Modifier.padding(vertical = padding)
+                            modifier = Modifier.padding(all = padding)
                         )
 
                         OutlinedTextField(
                             value = tempSelfAddress,
                             onValueChange = { text ->
-                                if (tempSelfAddress.length < 30) {
-                                    tempSelfAddress = text
-                                }
+                                tempSelfAddress = text
                             },
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                             label = { Text("Address") },
                             singleLine = true,
-                            modifier = Modifier.padding(vertical = padding)
+                            modifier = Modifier.padding(all = padding)
                         )
 
                         OutlinedTextField(
                             value = tempSelfEmail,
                             onValueChange = { text ->
-                                if (tempSelfEmail.length < 30) {
-                                    tempSelfEmail = text
-                                }
+                                tempSelfEmail = text
                             },
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                             label = { Text("Email") },
                             singleLine = true,
-                            modifier = Modifier.padding(vertical = padding)
+                            modifier = Modifier.padding(all = padding)
                         )
 
                         OutlinedTextField(
                             value = tempSelfTelephone,
                             onValueChange = { text ->
-                                if (tempSelfTelephone.length < 30) {
+                                val isValidDecimal = text.count { it == '+' } <= 1 &&
+                                        text.all { it.isDigit() || it == '+' }
+                                if (isValidDecimal) {
                                     tempSelfTelephone = text
                                 }
                             },
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Next,
+                                keyboardType = KeyboardType.Number
+                            ),
                             label = { Text("Telephone") },
                             singleLine = true,
-                            modifier = Modifier.padding(vertical = padding)
+                            modifier = Modifier.padding(all = padding)
                         )
 
                         Text(
@@ -5698,7 +5855,23 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                             label = { Text("Issue Date") },
                             singleLine = true,
                             readOnly = true,
-                            modifier = Modifier.padding(vertical = padding)
+                            modifier = Modifier.padding(all = padding),
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = { showIssueDatePicker = true },
+                                    colors = IconButtonDefaults.iconButtonColors(
+                                        containerColor = Color.White,
+                                        contentColor = Color.Black
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarMonth,
+                                        tint = Color.Black,
+                                        modifier = Modifier.size(25.dp),
+                                        contentDescription = "Issue Date"
+                                    )
+                                }
+                            }
                         )
 
                         OutlinedTextField(
@@ -5708,7 +5881,23 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                             label = { Text("Due Date") },
                             singleLine = true,
                             readOnly = true,
-                            modifier = Modifier.padding(vertical = padding)
+                            modifier = Modifier.padding(all = padding),
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = { showDueDatePicker = true },
+                                    colors = IconButtonDefaults.iconButtonColors(
+                                        containerColor = Color.White,
+                                        contentColor = Color.Black
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarMonth,
+                                        tint = Color.Black,
+                                        modifier = Modifier.size(25.dp),
+                                        contentDescription = "Due Date"
+                                    )
+                                }
+                            }
                         )
 
                         Text(
@@ -5725,26 +5914,29 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                         HorizontalDivider(thickness = 1.dp, color = Color.LightGray)
 
                         OutlinedTextField(
-                            value = tempTaxPercentage.toString(),
+                            value = if (tempTaxPercentage == 0.0) "" else tempTaxPercentage.toString(),
                             onValueChange = { text ->
                                 val isValidDecimal = text.count { it == '.' } <= 1 &&
                                         text.all { it.isDigit() || it == '.' }
                                 if (isValidDecimal) {
-                                    tempTaxPercentage = text.toDouble()
+                                    tempTaxPercentage = text.toDoubleOrNull() ?: 0.0
                                 }
                             },
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Next,
+                                keyboardType = KeyboardType.Number
+                            ),
                             label = { Text("Tax Percentage") },
                             singleLine = true,
                             trailingIcon = {
                                 Icon(
                                     imageVector = Icons.Default.Percent,
                                     tint = Color.Black,
-                                    modifier = Modifier.size(35.dp),
+                                    modifier = Modifier.size(25.dp),
                                     contentDescription = "Tax Percentage"
                                 )
                             },
-                            modifier = Modifier.padding(vertical = padding)
+                            modifier = Modifier.padding(all = padding)
                         )
 
                         Text(
@@ -5762,10 +5954,64 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
 
                         LazyColumn(
                             state = lazyListStateTwo,
-                            modifier = Modifier.size(screenWidth - 40.dp, 350.dp)
+                            modifier = Modifier
+                                .sizeIn(
+                                    minWidth = screenWidth - 40.dp,
+                                    maxHeight = 350.dp,
+                                    maxWidth = screenWidth - 40.dp,
+                                    minHeight = 100.dp
+                                )
+                                .background(color = Color.White)
                         ) {
-                            items(localItems.filter { it.invoiceId == tempInvoiceId }) {
-                                Row() { }
+                            items(invoiceItems, key = { it.id }) { item ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(color = Color.White)
+                                        .clickable(
+                                            onClick = { expandItemOptions = item.id }
+                                        ),
+                                    horizontalArrangement = Arrangement.SpaceAround,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = item.name,
+                                        fontSize = 18.sp,
+                                        fontWeight = Bold,
+                                        color = Color.Black
+                                    )
+
+                                    Row(
+                                        horizontalArrangement = Arrangement.SpaceAround,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Cost: $currencySymbol${item.price}",
+                                            color = Color.Gray,
+                                            fontSize = 14.sp,
+                                            modifier = Modifier.padding(end = 8.dp)
+                                        )
+
+                                        Text(
+                                            text = "Quantity: ${item.quantity}",
+                                            fontSize = 14.sp,
+                                            color = Color.Gray
+                                        )
+                                    }
+                                }
+
+                                DropdownMenu(
+                                    expanded = expandItemOptions == item.id,
+                                    onDismissRequest = { expandItemOptions = null }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Delete") },
+                                        onClick = {
+                                            viewModel.deleteItem(item.id)
+                                            expandItemOptions = null
+                                        }
+                                    )
+                                }
                             }
 
                             item {
@@ -5779,14 +6025,20 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                     IconButton(
                                         modifier = Modifier.size(40.dp),
                                         onClick = {
-                                            viewModel.createItem(
-                                                invoiceId = tempInvoiceId,
-                                                name = "",
-                                                price = 0.0,
-                                                quantity = 0
-                                            )
+                                            coroutineScope.launch {
+                                                val newItemId = viewModel.createItem(
+                                                    invoiceId = tempInvoiceId,
+                                                    name = "",
+                                                    price = 0.0,
+                                                    quantity = 0
+                                                ).toInt()
 
-                                            isAddingItem = true
+                                                tempItemId = newItemId
+
+                                                android.util.Log.d("Invoice Id On Init Item Create", "tempInvoiceId: $tempInvoiceId")
+
+                                                isAddingItem = true
+                                            }
                                         },
                                         colors = IconButtonColors(
                                             containerColor = Color.Blue,
@@ -5816,11 +6068,15 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                         ) {
                             Button(
                                 onClick = {
-                                    viewModel.deleteInvoice(localInvoices.lastIndex)
+                                    if (!isEditingInvoice) {
+                                        viewModel.deleteInvoice(tempInvoiceId)
+                                    }
+
+                                    isEditingInvoice = false
                                     isAddingInvoice = false
                                 },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color.Gray,
+                                    containerColor = Color.LightGray,
                                     contentColor = Color.Black
                                 )
                             ) {
@@ -5834,12 +6090,56 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
 
                             Button(
                                 onClick = {
+                                    val invoiceNumber = when {
+                                        tempSelfName.length >= 3 && tempClientName.length >= 3 -> {
+                                            tempSelfName.substring(0, 3)
+                                                .lowercase() + tempClientName.substring(0, 3)
+                                                .lowercase() + tempInvoiceId
+                                        }
+                                        else -> {
+                                            showNameLengthWarningDialog = true
+                                            ""
+                                        }
+                                    }
 
+                                    android.util.Log.d("Dates $tempInvoiceId", "tempIssueDate: $tempIssueDate, tempDueDate: $tempDueDate")
 
+                                    viewModel.updateInvoice(
+                                        invoiceId = tempInvoiceId,
+                                        invoiceNumber = invoiceNumber,
+                                        issueDate = tempIssueDate,
+                                        dueDate = tempDueDate,
+                                        issueTo = tempClientName,
+                                        clientCompany = tempClientCompanyORAddress,
+                                        clientEmail = tempClientEmail,
+                                        clientTelephone = tempClientTelephone,
+                                        payTo = tempSelfName,
+                                        selfAddress = tempSelfAddress,
+                                        selfEmail = tempSelfEmail,
+                                        selfTelephone = tempSelfTelephone,
+                                        taxPercentage = tempTaxPercentage,
+                                        amount = 0.0,
+                                        status = "DRAFT"
+                                    )
+
+                                    tempIssueDate = "--/--/----"
+                                    tempDueDate = "--/--/----"
+                                    tempClientName = ""
+                                    tempClientCompanyORAddress = ""
+                                    tempClientEmail = ""
+                                    tempClientTelephone = ""
+                                    tempSelfName = ""
+                                    tempSelfAddress = ""
+                                    tempSelfEmail = ""
+                                    tempSelfTelephone = ""
+                                    tempTaxPercentage = 0.0
+                                    // tempInvoiceId = 0
+
+                                    isEditingInvoice = false
                                     isAddingInvoice = false
                                 },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color.Gray,
+                                    containerColor = Color.Cyan,
                                     contentColor = Color.Black
                                 )
                             ) {
@@ -5861,14 +6161,17 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
     if (isAddingItem) {
         Dialog(
             onDismissRequest = {
-                viewModel.deleteItem(items.lastIndex)
+                viewModel.deleteItem(tempItemId)
+                tempItemName = ""
+                tempQuantity = 0
+                tempPrice = 0.0
 
                 isAddingItem = false
             }
         ) {
             DialogBoxSkeleton(
                 width = 550.dp,
-                height = 600.dp
+                height = 400.dp
             ) {
                 Column(
                     modifier = Modifier
@@ -5884,7 +6187,114 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                         color = Color.Black
                     )
 
+                    OutlinedTextField(
+                        value = tempItemName,
+                        label = { Text("Name") },
+                        onValueChange = { text ->
+                            if (tempItemName.length <= 30) {
+                                tempItemName = text
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        modifier = Modifier.padding(all = 10.dp)
+                    )
 
+                    OutlinedTextField(
+                        value = tempQuantity.toString(),
+                        label = { Text("Quantity") },
+                        onValueChange = { text ->
+                            val isValidDecimal = text.all { it.isDigit() }
+                            if (isValidDecimal) {
+                                tempQuantity = text.toIntOrNull() ?: 0
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next,
+                            keyboardType = KeyboardType.Number
+                        ),
+                        modifier = Modifier.padding(all = 10.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = if (tempPrice == 0.0) "" else tempPrice.toString(),
+                        label = { Text("Price Per Single") },
+                        onValueChange = { text ->
+                            val isValidDecimal = text.count { it == '.' } <= 1 &&
+                                    text.all { it.isDigit() || it == '.' }
+                            if (isValidDecimal) {
+                                tempPrice = text.toDoubleOrNull() ?: 0.0
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next,
+                            keyboardType = KeyboardType.Number
+                        ),
+                        modifier = Modifier.padding(all = 10.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceAround,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = {
+                                viewModel.deleteItem(tempItemId)
+                                tempItemName = ""
+                                tempQuantity = 0
+                                tempPrice = 0.0
+                                tempItemId = 0
+
+                                isAddingItem = false
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                contentColor = Color.Black,
+                                containerColor = Color.LightGray,
+                                disabledContentColor = Color.Black,
+                                disabledContainerColor = Color.LightGray
+                            )
+                        ) {
+                            Text(
+                                text = "Cancel",
+                                fontSize = 14.sp,
+                                fontWeight = Bold,
+                                color = Color.Black
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                android.util.Log.d("Item Id on updateItem", "tempItemId: $tempItemId")
+
+                                viewModel.updateItem(
+                                    itemId = tempItemId ,
+                                    name = tempItemName,
+                                    price = tempPrice,
+                                    quantity = tempQuantity
+                                )
+
+                                tempItemName = ""
+                                tempQuantity = 0
+                                tempPrice = 0.0
+                                tempItemId = 0
+
+                                isAddingItem = false
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                contentColor = Color.Black,
+                                containerColor = Color.Cyan,
+                                disabledContentColor = Color.Black,
+                                disabledContainerColor = Color.Cyan
+                            )
+                        ) {
+                            Text(
+                                text = "Confirm",
+                                fontSize = 14.sp,
+                                fontWeight = Bold,
+                                color = Color.Black
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -5897,7 +6307,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
             confirmButton = {
                 Button(
                     onClick = {
-                        tempIssueDate = selectedDate
+                        tempIssueDate = selectedIssueDate
                         showIssueDatePicker = false
                     },
                     // shape = RoundedCornerShape(8.dp),
@@ -5941,9 +6351,128 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
             }
         ) {
             DatePicker(
-                state = datePickerState,
+                state = issueDatePickerState,
                 showModeToggle = false
             )
+        }
+    }
+
+    // show due date picker
+    if (showDueDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDueDatePicker = false },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        tempDueDate = selectedDueDate
+
+                        android.util.Log.d("Dates $tempInvoiceId", "selectedDueDate: $selectedDueDate, tempDueDate: $tempDueDate")
+                        showDueDatePicker = false
+                    },
+                    // shape = RoundedCornerShape(8.dp),
+                    colors = ButtonColors(
+                        containerColor = Color.Cyan,
+                        contentColor = Color.Black,
+                        disabledContainerColor = Color.Cyan,
+                        disabledContentColor = Color.Black
+                    ),
+                    modifier = Modifier.padding(horizontal = 35.dp)
+                ) {
+                    Text(
+                        text = "Confirm",
+                        fontWeight = Bold,
+                        fontSize = 18.sp,
+                        color = Color.Black
+                    )
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = {
+                        showDueDatePicker = false
+                    },
+                    // shape = RoundedCornerShape(8.dp),
+                    colors = ButtonColors(
+                        containerColor = Color.LightGray,
+                        contentColor = Color.Black,
+                        disabledContainerColor = Color.LightGray,
+                        disabledContentColor = Color.Black
+                    ),
+                    modifier = Modifier.padding(end = 20.dp)
+                ) {
+                    Text(
+                        text = "Cancel",
+                        fontWeight = Bold,
+                        fontSize = 18.sp,
+                        color = Color.Black
+                    )
+                }
+            }
+        ) {
+            DatePicker(
+                state = dueDatePickerState,
+                showModeToggle = false
+            )
+        }
+    }
+
+    if (showNameLengthWarningDialog) {
+        Dialog(
+            onDismissRequest = {
+                showNameLengthWarningDialog = false
+            }
+        ) {
+            DialogBoxSkeleton(
+                width = 550.dp,
+                height = 200.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = "Name Length Warning",
+                        tint = Color.Gray,
+                        modifier = Modifier.size(30.dp)
+                    )
+
+                    Text(
+                        text = "Name Length",
+                        fontWeight = Bold,
+                        fontSize = 25.sp,
+                        color = Color.Black
+                    )
+
+                    Text(
+                        text = "Client name and your name should be more than 3 characters long.",
+                        fontSize = 17.sp,
+                        color = Color.Gray
+                    )
+
+                    Button(
+                        onClick = {
+                            showNameLengthWarningDialog = false
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Cyan,
+                            contentColor = Color.Black,
+                            disabledContainerColor = Color.Cyan,
+                            disabledContentColor = Color.Black
+                        )
+                    ) {
+                        Text(
+                            text = "Dismiss",
+                            fontWeight = Bold,
+                            fontSize = 20.sp,
+                            color = Color.Black
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -6096,6 +6625,30 @@ fun GreetingPreview() {
 fun convertMillisToDate(millis: Long): String {
     val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     return formatter.format(Date(millis))
+}
+
+fun convertDateToMillis(dateString: String): Long? {
+    if (dateString == "--/--/----" || dateString.isBlank()) return null
+
+    return try {
+        val format = SimpleDateFormat("MM/dd/yyyy", Locale.getDefault())
+        format.parse(dateString)?.time
+    } catch (e: Exception) {
+        null
+    }
+}
+
+fun sharePdf(context: Context, uri: Uri) {
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, "application/pdf")
+        flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+    }
+
+    // Fallback to a chooser if no default PDF viewer exists
+    val chooser = Intent.createChooser(intent, "Open Invoice PDF")
+    chooser.flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+
+    context.startActivity(chooser)
 }
 
 @Composable
