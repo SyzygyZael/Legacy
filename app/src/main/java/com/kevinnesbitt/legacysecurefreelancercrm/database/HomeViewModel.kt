@@ -101,6 +101,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                             invoices = invoices
                                 .filter { it.projectId == project.id }
                                 .map { invoice ->
+                                    android.util.Log.d("Invoice on Invoice Data Creation", "invoice: $invoice")
                                     InvoiceData(
                                         id = invoice.id,
                                         projectId = invoice.projectId,
@@ -376,6 +377,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteInvoice(invoiceId: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             dao.deleteInvoice(invoiceId)
+        }
+    }
+
+    fun getInvoice(invoiceId: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.getInvoice(invoiceId)
+        }
+    }
+
+    fun updateInvoiceStatus(invoiceId: Int, status: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.updateInvoiceStatus(invoiceId, status)
         }
     }
 

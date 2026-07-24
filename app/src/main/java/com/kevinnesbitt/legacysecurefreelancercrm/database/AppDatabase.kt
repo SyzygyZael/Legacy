@@ -197,9 +197,10 @@ interface AppDao {
     suspend fun updateItem(itemId: Int, name: String, price: Double, quantity: Int)
 
     @Query("UPDATE invoices SET invoiceNumber = :invoiceNumber, issueDate = :issueDate, dueDate = :dueDate, issueTo = :issueTo, clientCompany = :clientCompany, clientEmail = :clientEmail, clientTelephone = :clientTelephone, payTo = :payTo, selfAddress = :selfAddress, selfEmail = :selfEmail, selfTelephone = :selfTelephone, taxPercentage = :taxPercentage, amount = :amount, status = :status WHERE id = :invoiceId")
-    suspend fun updateInvoice(invoiceId: Int, invoiceNumber: String, issueDate: String, dueDate: String, issueTo: String, clientCompany: String, clientEmail: String, clientTelephone: String, payTo: String, selfAddress: String, selfEmail: String, selfTelephone: String, taxPercentage: Double, amount: Double, status: String) {
-        android.util.Log.d("Database Dates $invoiceId", "Issue Date: $issueDate, Due Date: $dueDate")
-    }
+    suspend fun updateInvoice(invoiceId: Int, invoiceNumber: String, issueDate: String, dueDate: String, issueTo: String, clientCompany: String, clientEmail: String, clientTelephone: String, payTo: String, selfAddress: String, selfEmail: String, selfTelephone: String, taxPercentage: Double, amount: Double, status: String)
+
+    @Query("UPDATE invoices SET status = :status WHERE id = :invoiceId")
+    suspend fun updateInvoiceStatus(invoiceId: Int, status: String)
 
     @Query("UPDATE settings SET timeFormat = :timeFormat, selfName = :selfName, selfAddress = :selfAddress, selfEmail = :selfEmail, selfTelephone = :selfTelephone WHERE id = 1")
     suspend fun updateSettings(
@@ -236,6 +237,9 @@ interface AppDao {
     @Query("SELECT * FROM time_logs WHERE projectId = :projectId")
     suspend fun getTimeLogsFromProjectId(projectId: Int): List<TimeLogsEntity>
 
+    @Query("SELECT * FROM invoices WHERE id = :invoiceId")
+    suspend fun getInvoice(invoiceId: Int): InvoiceEntity
+
     // TIMER QUERIES
     @Query("UPDATE settings SET isTiming = :timeState WHERE id = 1")
     suspend fun updateTimerState(timeState: Boolean)
@@ -270,7 +274,7 @@ interface AppDao {
         ItemEntity::class,
         SettingsEntity::class
                          ],
-        version = 27
+        version = 29
     )
     abstract class AppDatabase : RoomDatabase() {
         abstract fun appDao(): AppDao

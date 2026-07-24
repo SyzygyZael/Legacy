@@ -1,5 +1,6 @@
 package com.kevinnesbitt.legacysecurefreelancercrm.screens
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -20,7 +21,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowLeft
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowLeft
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.Warning
@@ -51,6 +55,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
@@ -136,6 +141,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
 
     var expandInvoiceOptions by remember { mutableStateOf<Int?>(null) }
     var expandItemOptions by remember { mutableStateOf<Int?>(null) }
+    var expandInvoiceStatusOptions by remember { mutableStateOf<Int?>(null) }
 
     var isAddingInvoice by remember { mutableStateOf(false) }
     var isEditingInvoice by remember { mutableStateOf(false) }
@@ -240,6 +246,9 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
             state = lazyListState
         ) {
             items(localInvoices, key = { invoice -> invoice.id }) { invoice ->
+                android.util.Log.d("Id drawing", "invoice.id: ${invoice.id}")
+                android.util.Log.d("Invoice drawing", "invoice: $invoice")
+
                 Card(
                     elevation = CardDefaults.elevatedCardElevation(5.dp ,5.dp,5.dp,5.dp,5.dp,5.dp),
                     shape = RoundedCornerShape(10.dp),
@@ -278,16 +287,53 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                             )
                         }
 
-                        Text(
-                            text = invoice.status,
-                            color = when(invoice.status) {
-                                InvoiceStatus.DRAFT.name -> Color.Gray
-                                InvoiceStatus.SENT.name -> Color.Yellow
-                                InvoiceStatus.PAID.name -> Color.Green
-                                else -> Color.Red
-                            },
-                            fontSize = 20.sp
-                        )
+                        Row(
+                            modifier = Modifier.clickable(
+                                onClick = {
+                                    expandInvoiceStatusOptions = invoice.id
+                                }
+                            )
+                        ) {
+                            DropdownMenu(
+                                expanded = expandInvoiceStatusOptions == invoice.id,
+                                onDismissRequest = { expandInvoiceStatusOptions = null }
+                            ) {
+                                InvoiceStatus.entries.forEach { status ->
+                                    if (invoice.status != status.name) {
+                                        DropdownMenuItem(
+                                            text = { Text(status.name) },
+                                            onClick = {
+                                                viewModel.updateInvoiceStatus(invoice.id, status.name)
+                                                expandInvoiceStatusOptions = null
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            val rotationAngle by animateFloatAsState(
+                                targetValue = if (expandInvoiceStatusOptions == invoice.id) -90f else 0f,
+                                label = "IconRotationAnimation"
+                            )
+
+                            Text(
+                                text = invoice.status,
+                                color = when(invoice.status) {
+                                    InvoiceStatus.DRAFT.name -> Color.Gray
+                                    InvoiceStatus.SENT.name -> Color.Yellow
+                                    InvoiceStatus.PAID.name -> Color.Green
+                                    else -> Color.Red
+                                },
+                                fontSize = 20.sp
+                            )
+
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowLeft,
+                                contentDescription = "Status Dropdown",
+                                tint = Color.Black,
+                                modifier = Modifier.rotate(rotationAngle)
+                            )
+                        }
                     }
 
                     DropdownMenu(
@@ -329,6 +375,8 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                 tempSelfEmail = invoice.selfEmail
                                 tempSelfTelephone = invoice.selfTelephone
                                 tempTaxPercentage = invoice.taxPercentage
+
+                                android.util.Log.d("Id on tap Edit", "tempInvoiceId: $tempInvoiceId")
 
                                 isAddingInvoice = true
                                 isEditingInvoice = true
@@ -378,6 +426,8 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                 ).toInt()
 
                                 tempInvoiceId = newInvoiceId
+
+                                android.util.Log.d("Id after creation", "tempInvoiceId: $tempInvoiceId")
 
                                 isAddingInvoice = true
                             }
@@ -841,6 +891,15 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                     }
                                 }
 
+                                var subtotal = 0.0
+                                invoiceItems.forEach { item ->
+                                    val lineTotal = item.price * item.quantity
+                                    subtotal += lineTotal
+                                }
+                                
+                                val taxAmount = subtotal * (tempTaxPercentage / 100.0)
+                                val grandTotal = subtotal + taxAmount
+
                                 viewModel.updateInvoice(
                                     invoiceId = tempInvoiceId,
                                     invoiceNumber = invoiceNumber,
@@ -855,9 +914,11 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                     selfEmail = tempSelfEmail,
                                     selfTelephone = tempSelfTelephone,
                                     taxPercentage = tempTaxPercentage,
-                                    amount = 0.0,
+                                    amount = grandTotal,
                                     status = InvoiceStatus.DRAFT.name
                                 )
+
+                                android.util.Log.d("Invoice on update", "invoice: ${viewModel.getInvoice(tempInvoiceId)}")
 
                                 tempIssueDate = "--/--/----"
                                 tempDueDate = "--/--/----"
