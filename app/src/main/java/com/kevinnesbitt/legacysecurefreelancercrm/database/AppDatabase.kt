@@ -98,8 +98,6 @@ data class ItemEntity(
 @Entity(tableName = "settings")
 data class SettingsEntity(
     @PrimaryKey(autoGenerate = false) val id: Int = 1,
-    val backgroundColor: Long = 0xFFFFFFFFL,
-    val mainTextColor: Long = 0xFF000000L,
     val isTiming: Boolean = false,
     // val isPaused: Boolean = false,
     val timeFormat: String = "12-Hour",
@@ -203,8 +201,14 @@ interface AppDao {
         android.util.Log.d("Database Dates $invoiceId", "Issue Date: $issueDate, Due Date: $dueDate")
     }
 
-    @Query("UPDATE settings SET timeFormat = :timeFormat WHERE id = 1")
-    suspend fun updateSettings(timeFormat: String)
+    @Query("UPDATE settings SET timeFormat = :timeFormat, selfName = :selfName, selfAddress = :selfAddress, selfEmail = :selfEmail, selfTelephone = :selfTelephone WHERE id = 1")
+    suspend fun updateSettings(
+        timeFormat: String,
+        selfName: String,
+        selfAddress: String,
+        selfEmail: String,
+        selfTelephone: String
+    )
 
     // DELETE QUERIES
     @Query("DELETE FROM tasks WHERE id = :taskId")
@@ -266,7 +270,7 @@ interface AppDao {
         ItemEntity::class,
         SettingsEntity::class
                          ],
-        version = 26
+        version = 27
     )
     abstract class AppDatabase : RoomDatabase() {
         abstract fun appDao(): AppDao

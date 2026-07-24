@@ -73,6 +73,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -118,10 +119,12 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
     var tempClientEmail by remember(client) { mutableStateOf(client?.email?: "") }
     var tempClientTelephone by remember(client) { mutableStateOf(client?.telp?: "") }
     var tempClientCompanyORAddress by remember { mutableStateOf("") }
-    var tempSelfName by remember { mutableStateOf("") }
-    var tempSelfAddress by remember { mutableStateOf("") }
-    var tempSelfEmail by remember { mutableStateOf("") }
-    var tempSelfTelephone by remember { mutableStateOf("") }
+
+    var tempSelfName by remember(settings) { mutableStateOf(settings.selfName) }
+    var tempSelfAddress by remember(settings) { mutableStateOf(settings.selfAddress) }
+    var tempSelfEmail by remember(settings) { mutableStateOf(settings.selfEmail) }
+    var tempSelfTelephone by remember(settings) { mutableStateOf(settings.selfTelephone) }
+
     var tempIssueDate by remember { mutableStateOf("--/--/----") }
     var tempDueDate by remember { mutableStateOf("--/--/----") }
     var tempTaxPercentage by remember { mutableDoubleStateOf(0.0) }

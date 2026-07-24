@@ -207,9 +207,21 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     // USER ACTIONS & INTENTS (Database Writes)
     // ==========================================
 
-    fun updateSettings(timeFormat: String) {
+    fun updateSettings(
+        timeFormat: String,
+        selfName: String,
+        selfAddress: String,
+        selfEmail: String,
+        selfTelephone: String
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
-            dao.updateSettings(timeFormat)
+            dao.updateSettings(
+                timeFormat = timeFormat,
+                selfName = selfName,
+                selfAddress = selfAddress,
+                selfTelephone = selfTelephone,
+                selfEmail = selfEmail
+            )
         }
     }
 

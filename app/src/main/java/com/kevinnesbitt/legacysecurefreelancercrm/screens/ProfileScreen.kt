@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.ArrowBackIosNew
@@ -20,16 +21,23 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonColors
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight.Companion.Bold
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -40,6 +48,17 @@ import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
 fun ProfileScreen(viewModel: HomeViewModel, navController: NavController, innerPadding: PaddingValues) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    val windowInfo = LocalWindowInfo.current
+    val screenWidth = windowInfo.containerDpSize.width
+    val screenHeight = windowInfo.containerDpSize.height
+
+    var tempName by remember(settings) { mutableStateOf(settings.selfName) }
+    var tempAddress by remember(settings) { mutableStateOf(settings.selfAddress) }
+    var tempEmail by remember(settings) { mutableStateOf(settings.selfEmail) }
+    var tempTelephone by remember(settings) { mutableStateOf(settings.selfTelephone)}
+
+    var changedValue by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -89,13 +108,19 @@ fun ProfileScreen(viewModel: HomeViewModel, navController: NavController, innerP
 
                 // save button
                 Button(
-                    enabled = true,
+                    enabled = changedValue,
                     onClick = {
-                        // viewModel.updateSettings(
-                        //
-                        // )
+                        viewModel.updateSettings(
+                            timeFormat = settings.timeFormat,
+                            selfName = tempName,
+                            selfAddress = tempAddress,
+                            selfEmail = tempEmail,
+                            selfTelephone = tempTelephone
+                        )
 
                         Toast.makeText(context, "Saved Changes", Toast.LENGTH_LONG).show()
+
+                        changedValue = false
                     },
                     colors = ButtonColors(
                         containerColor = Color.White,
@@ -113,6 +138,88 @@ fun ProfileScreen(viewModel: HomeViewModel, navController: NavController, innerP
             }
         }
 
+        OutlinedTextField(
+            value = tempName,
+            label = { Text("Name") },
+            onValueChange = { text ->
+                if (tempName.length <= 50) {
+                    tempName = text
+                    changedValue = true
+                }
+            },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+            singleLine = true,
+            modifier = Modifier
+                .padding(
+                    start = 10.dp,
+                    end = 60.dp,
+                    top = 15.dp
+                )
+                .fillMaxWidth()
+        )
 
+        OutlinedTextField(
+            value = tempAddress,
+            label = { Text("Address") },
+            onValueChange = { text ->
+                tempAddress = text
+                changedValue = true
+            },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+            singleLine = true,
+            modifier = Modifier
+                .padding(
+                    start = 10.dp,
+                    end = 60.dp,
+                    top = 15.dp
+                )
+                .fillMaxWidth()
+        )
+
+        OutlinedTextField(
+            value = tempEmail,
+            label = { Text("Email") },
+            onValueChange = { text ->
+                tempEmail = text
+                changedValue = true
+            },
+            keyboardOptions = KeyboardOptions(
+                imeAction = ImeAction.Next,
+                keyboardType = KeyboardType.Email
+            ),
+            singleLine = true,
+            modifier = Modifier
+                .padding(
+                start = 10.dp,
+                end = 60.dp,
+                top = 15.dp
+                )
+                .fillMaxWidth()
+        )
+
+        OutlinedTextField(
+            value = tempTelephone,
+            label = { Text("Telephone") },
+            onValueChange = { text ->
+                val isValidDecimal = text.count { it == '+' } <= 1 &&
+                        text.all { it.isDigit() || it == '+' }
+                if (isValidDecimal) {
+                    tempTelephone = text
+                    changedValue = true
+                }
+            },
+            keyboardOptions = KeyboardOptions(
+                imeAction = ImeAction.Next,
+                keyboardType = KeyboardType.Number
+            ),
+            singleLine = true,
+            modifier = Modifier
+                .padding(
+                start = 10.dp,
+                end = 60.dp,
+                top = 15.dp
+                )
+                .fillMaxWidth()
+        )
     }
 }

@@ -98,7 +98,11 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
                     enabled = changedSettings,
                     onClick = {
                         viewModel.updateSettings(
-                            timeFormat = timeFormatChoiceString
+                            timeFormat = timeFormatChoiceString,
+                            selfName = settings.selfName,
+                            selfEmail = settings.selfEmail,
+                            selfAddress = settings.selfAddress,
+                            selfTelephone = settings.selfTelephone
                         )
 
                         Toast.makeText(context, "Saved Changes", Toast.LENGTH_LONG).show()
