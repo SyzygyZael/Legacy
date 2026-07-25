@@ -3,19 +3,20 @@ package com.kevinnesbitt.legacysecurefreelancercrm.util
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import com.kevinnesbitt.legacysecurefreelancercrm.database.SettingsEntity
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-fun convertMillisToDate(millis: Long): String {
-    val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+fun convertMillisToDate(millis: Long, settings: SettingsEntity): String {
+    val formatter = SimpleDateFormat(settings.dateFormat, Locale.getDefault())
     return formatter.format(Date(millis))
 }
 
-fun convertDateToMillis(dateString: String): Long? {
+fun convertDateToMillis(dateString: String, settings: SettingsEntity): Long? {
     if (dateString == "--/--/----" || dateString.isBlank()) return null
     return try {
-        val format = SimpleDateFormat("MM/dd/yyyy", Locale.getDefault())
+        val format = SimpleDateFormat(settings.dateFormat, Locale.getDefault())
         format.parse(dateString)?.time
     } catch (e: Exception) {
         null

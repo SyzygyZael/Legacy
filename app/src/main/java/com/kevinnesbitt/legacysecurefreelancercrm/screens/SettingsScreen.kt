@@ -41,11 +41,14 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
     val context = LocalContext.current
 
     var timeFormatChoiceString by remember(settings) { mutableStateOf(settings.timeFormat) }
+    var dateFormatChoiceString by remember(settings) { mutableStateOf(settings.dateFormat) }
 
     var isChoosingTimeFormat by remember { mutableStateOf(false) }
+    var isChoosingDateFormat by remember { mutableStateOf(false) }
 
     val changedSettings = when {
         (timeFormatChoiceString != settings.timeFormat) -> true
+        (dateFormatChoiceString != settings.dateFormat) -> true
         else -> false
     }
 
@@ -99,6 +102,7 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
                     onClick = {
                         viewModel.updateSettings(
                             timeFormat = timeFormatChoiceString,
+                            dateFormat = dateFormatChoiceString,
                             selfName = settings.selfName,
                             selfEmail = settings.selfEmail,
                             selfAddress = settings.selfAddress,
@@ -151,6 +155,54 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
                     timeFormatChoiceString = "24-Hour"
                 }
             )
+        }
+
+        DropdownSettingsRow(
+            expanded = isChoosingDateFormat,
+            onDismissRequest = { isChoosingDateFormat = false },
+            title = "Date Format",
+            value = dateFormatChoiceString,
+            onClick = { isChoosingDateFormat = true }
+        ) {
+            if (dateFormatChoiceString != "MM/dd/yyyy") {
+                DropdownMenuItem(
+                    text = { Text("MM/dd/yyyy") },
+                    onClick = {
+                        dateFormatChoiceString = "MM/dd/yyyy"
+                        isChoosingDateFormat = false
+                    }
+                )
+            }
+
+            if (dateFormatChoiceString != "dd/MM/yyyy") {
+                DropdownMenuItem(
+                    text = { Text("dd/MM/yyyy") },
+                    onClick = {
+                        dateFormatChoiceString = "dd/MM/yyyy"
+                        isChoosingDateFormat = false
+                    }
+                )
+            }
+
+            if (dateFormatChoiceString != "yyyy-MM-dd") {
+                DropdownMenuItem(
+                    text = { Text("yyyy-MM-dd") },
+                    onClick = {
+                        dateFormatChoiceString = "yyyy-MM-dd"
+                        isChoosingDateFormat = false
+                    }
+                )
+            }
+
+            if (dateFormatChoiceString != "yyyy/MM/dd") {
+                DropdownMenuItem(
+                    text = { Text("yyyy/MM/dd") },
+                    onClick = {
+                        dateFormatChoiceString = "yyyy/MM/dd"
+                        isChoosingDateFormat = false
+                    }
+                )
+            }
         }
     }
 }

@@ -74,8 +74,7 @@ import java.util.Locale
 fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
     val settings by viewModel.settings.collectAsState()
 
-    val clientState =
-        viewModel.clientState.collectAsStateWithLifecycle().value.find { clientId == it.id }
+    val clientState = viewModel.clientState.collectAsStateWithLifecycle().value.find { clientId == it.id }
     val project = clientState?.projects?.find { it.id == projectId }
     val timeLogs = project?.timeLogs?: emptyList()
 
@@ -117,7 +116,7 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
     val selectedDate = datePickerState.selectedDateMillis?.let {
-        convertMillisToDate(it)
+        convertMillisToDate(it, settings)
     } ?: "No date selected"
 
     var expandTaskOptions by remember { mutableStateOf<Int?>(null) }

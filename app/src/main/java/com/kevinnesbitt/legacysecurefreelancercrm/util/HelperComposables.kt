@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +16,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
@@ -29,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight.Companion.Bold
 import androidx.compose.ui.text.style.TextAlign
@@ -55,6 +60,71 @@ fun DialogBoxSkeleton(onDismissRequest: () -> Unit, width: Dp, height: Dp, conte
             shape = RoundedCornerShape(25.dp),
             border = BorderStroke(2.dp, Color.Gray)
         ) { content() }
+    }
+}
+
+@Composable
+fun DialogBox(
+    iconImageVector: ImageVector? = null,
+    title: String? = null,
+    description: String? = null,
+    onDismissRequest: () -> Unit,
+    width: Dp = 550.dp,
+    height: Dp = 300.dp,
+    buttonRow: @Composable (() -> Unit) = {  },
+    content: @Composable (() -> Unit)
+) {
+    Dialog(
+        onDismissRequest = onDismissRequest
+    ) {
+        Surface(
+            color = Color.White,
+            modifier = Modifier.size(width, height),
+            shape = RoundedCornerShape(25.dp),
+            border = BorderStroke(2.dp, Color.Gray)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceEvenly
+            ) {
+                if (iconImageVector != null) {
+                    Icon(
+                        imageVector = iconImageVector,
+                        contentDescription = "Dialog Icon",
+                        tint = Color.Gray,
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
+
+                if (title != null) {
+                    Text(
+                        text = title,
+                        fontWeight = Bold,
+                        fontSize = 25.sp,
+                        color = Color.Black
+                    )
+                }
+
+                if (description != null) {
+                    Text(
+                        text = description,
+                        fontSize = 17.sp,
+                        color = Color.Gray
+                    )
+                }
+
+                content()
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) { buttonRow() }
+            }
+        }
     }
 }
 

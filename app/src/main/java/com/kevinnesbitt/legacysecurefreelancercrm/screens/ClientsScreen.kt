@@ -78,41 +78,17 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
         }
     }
 
-    var tempNameText by remember {
-        mutableStateOf("")
-    }
+    var tempNameText by remember { mutableStateOf("") }
+    var tempCompanyText by remember { mutableStateOf("") }
+    var tempEmailText by remember { mutableStateOf("") }
+    var tempTelpNum by remember { mutableStateOf("") }
+    var tempCurrency by remember { mutableStateOf("") }
 
-    var tempEmailText by remember {
-        mutableStateOf("")
-    }
-
-    var tempTelpNum by remember {
-        mutableStateOf("")
-    }
-
-    var tempCurrency by remember {
-        mutableStateOf("")
-    }
-
-    var isAddingClient by remember {
-        mutableStateOf(false)
-    }
-
-    var expandCurrencyChoice by remember {
-        mutableStateOf(false)
-    }
-
-    var expandClientOptions by remember {
-        mutableStateOf<Int?>(null)
-    }
-
-    var expandClientScreenMenu by remember {
-        mutableStateOf(false)
-    }
-
-    var showArchived by remember {
-        mutableStateOf(false)
-    }
+    var isAddingClient by remember { mutableStateOf(false) }
+    var expandCurrencyChoice by remember { mutableStateOf(false) }
+    var expandClientOptions by remember { mutableStateOf<Int?>(null) }
+    var expandClientScreenMenu by remember { mutableStateOf(false) }
+    var showArchived by remember { mutableStateOf(false) }
 
     LaunchedEffect(clientStates) {
         localClientStates = clientStates
@@ -441,11 +417,19 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
     // Client adding
     if (isAddingClient) {
         Dialog(
-            onDismissRequest = { isAddingClient = false }
+            onDismissRequest = {
+                tempNameText = ""
+                tempCompanyText = ""
+                tempEmailText = ""
+                tempCurrency = ""
+                tempTelpNum = "0.0"
+
+                isAddingClient = false
+            }
         ) {
             Surface(
                 color = Color.White,
-                modifier = Modifier.size(350.dp, 450.dp),
+                modifier = Modifier.size(350.dp, 550.dp),
                 shape = RoundedCornerShape(25.dp),
                 border = BorderStroke(2.dp, Color.Gray)
             ) {
@@ -476,6 +460,30 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                         value = tempNameText,
                         onValueChange = { text ->
                             tempNameText = text
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(5.dp),
+                        textStyle = TextStyle(fontSize = 20.sp),
+                        singleLine = true
+                    )
+
+                    HorizontalDivider(color = Color.White)
+
+                    Text(
+                        text = "  Company or Address",
+                        textAlign = TextAlign.Left,
+                        fontSize = 15.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        fontWeight = Bold
+                    )
+                    OutlinedTextField(
+                        value = tempCompanyText,
+                        onValueChange = { text ->
+                            tempCompanyText = text
                         },
                         keyboardOptions = KeyboardOptions(
                             imeAction = ImeAction.Next
@@ -595,6 +603,13 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                     ) {
                         Button(
                             onClick = {
+                                tempNameText = ""
+                                tempCompanyText = ""
+                                tempEmailText = ""
+                                tempCurrency = ""
+                                tempTelpNum = "0.0"
+                                isAddingClient = false
+
                                 isAddingClient = false
                             },
                             colors = ButtonColors(
@@ -612,14 +627,17 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                                 if (tempNameText.isNotBlank()) {
                                     viewModel.createClient(
                                         name = tempNameText,
+                                        company = tempCompanyText,
                                         email = tempEmailText,
                                         currency = tempCurrency,
                                         telp = tempTelpNum
                                     )
                                     tempNameText = ""
+                                    tempCompanyText = ""
                                     tempEmailText = ""
                                     tempCurrency = ""
                                     tempTelpNum = "0.0"
+
                                     isAddingClient = false
                                 }
                             },

@@ -74,8 +74,11 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Composable
 fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+
     val clientState = viewModel.clientState.collectAsStateWithLifecycle().value.find { clientId == it.id }
     val clientName = clientState?.name?: ""
+    val clientCompany = clientState?.company?: ""
     val clientEmail = clientState?.email?: ""
     val clientPhoneNum = clientState?.telp?: ""
     val clientProjects = clientState?.projects?: emptyList()
@@ -95,7 +98,7 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
     val selectedDate = datePickerState.selectedDateMillis?.let {
-        convertMillisToDate(it)
+        convertMillisToDate(it, settings)
     } ?: ""
 
     var localProjects by remember(clientProjects) { mutableStateOf(clientProjects) }
@@ -110,29 +113,20 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
     var showEditClientDialog by remember { mutableStateOf(false) }
 
     var tempNameText by remember { mutableStateOf("") }
-
+    var tempCompanyText by remember { mutableStateOf("") }
     var tempEmailText by remember { mutableStateOf("") }
-
     var tempTelpNum by remember { mutableStateOf("") }
-
     var tempCurrency by remember { mutableStateOf("") }
 
     var expandCurrencyChoice by remember { mutableStateOf(false) }
-
     var expandBillingTypeChoice by remember { mutableStateOf(false) }
-
     var isAddingProject by remember { mutableStateOf(false) }
 
     var tempProjectTitle by remember { mutableStateOf("") }
-
     var tempProjectDescription by remember { mutableStateOf("") }
-
     var tempProjectRate by remember { mutableDoubleStateOf(0.0) }
-
     var tempProjectBudget by remember { mutableDoubleStateOf(0.0) }
-
     var tempProjectBillingType by remember { mutableStateOf("") }
-
     var tempProjectDeadline by remember { mutableStateOf("--/--/----") }
 
     var expandProjectOptions by remember { mutableStateOf<Int?>(null) }
@@ -195,6 +189,7 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                             modifier = Modifier.fillMaxSize(),
                             onClick = {
                                 tempNameText = clientName
+                                tempCompanyText = clientCompany
                                 tempEmailText = clientEmail
                                 tempCurrency = clientCurrency
                                 tempTelpNum = clientPhoneNum
@@ -584,11 +579,19 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
     // edit client
     if (showEditClientDialog) {
         Dialog(
-            onDismissRequest = { showEditClientDialog = false }
+            onDismissRequest = {
+                tempNameText = ""
+                tempCompanyText = ""
+                tempEmailText = ""
+                tempCurrency = ""
+                tempTelpNum = "0.0"
+
+                showEditClientDialog = false
+            }
         ) {
             Surface(
                 color = Color.White,
-                modifier = Modifier.size(350.dp, 450.dp),
+                modifier = Modifier.size(350.dp, 550.dp),
                 shape = RoundedCornerShape(25.dp),
                 border = BorderStroke(2.dp, Color.Gray)
             ) {
@@ -619,6 +622,30 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                         value = tempNameText,
                         onValueChange = { text ->
                             tempNameText = text
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(5.dp),
+                        textStyle = TextStyle(fontSize = 20.sp),
+                        singleLine = true
+                    )
+
+                    HorizontalDivider(color = Color.White)
+
+                    Text(
+                        text = "  Company or Address",
+                        textAlign = TextAlign.Left,
+                        fontSize = 15.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        fontWeight = Bold
+                    )
+                    OutlinedTextField(
+                        value = tempCompanyText,
+                        onValueChange = { text ->
+                            tempCompanyText = text
                         },
                         keyboardOptions = KeyboardOptions(
                             imeAction = ImeAction.Next
@@ -738,6 +765,12 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                     ) {
                         Button(
                             onClick = {
+                                tempNameText = ""
+                                tempCompanyText = ""
+                                tempEmailText = ""
+                                tempCurrency = ""
+                                tempTelpNum = "0.0"
+
                                 showEditClientDialog = false
                             },
                             colors = ButtonColors(
@@ -755,12 +788,14 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                                 if (tempNameText.isNotBlank()) {
                                     viewModel.updateClientInfo(
                                         newName = tempNameText,
+                                        company = tempCompanyText,
                                         newEmail = tempEmailText,
                                         newCurrency = tempCurrency,
                                         newTelp = tempTelpNum,
                                         clientId = clientId
                                     )
                                     tempNameText = ""
+                                    tempCompanyText = ""
                                     tempEmailText = ""
                                     tempCurrency = ""
                                     tempTelpNum = "0.0"

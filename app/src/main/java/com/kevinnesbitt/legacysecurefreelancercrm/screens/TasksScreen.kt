@@ -65,6 +65,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Composable
 fun TasksScreen(projectName: String, projectId: Int, clientId: Int, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
     val clientState = viewModel.clientState.collectAsStateWithLifecycle().value.find { clientId == it.id }
     val project = clientState?.projects?.find { it.id == projectId }
     val tasks = project?.tasks?: emptyList()
@@ -84,7 +85,7 @@ fun TasksScreen(projectName: String, projectId: Int, clientId: Int, viewModel: H
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
     val selectedDate = datePickerState.selectedDateMillis?.let {
-        convertMillisToDate(it)
+        convertMillisToDate(it, settings)
     } ?: ""
 
     var tempTaskId by remember { mutableIntStateOf(0) }
@@ -339,7 +340,12 @@ fun TasksScreen(projectName: String, projectId: Int, clientId: Int, viewModel: H
     // add task
     if (isAddingTask) {
         Dialog(
-            onDismissRequest = { isAddingTask = false }
+            onDismissRequest = {
+                tempTaskName = ""
+                tempTaskDeadline = "--/--/----"
+
+                isAddingTask = false
+            }
         ) {
             Surface(
                 color = Color.White,
@@ -399,6 +405,9 @@ fun TasksScreen(projectName: String, projectId: Int, clientId: Int, viewModel: H
                     ) {
                         Button(
                             onClick = {
+                                tempTaskName = ""
+                                tempTaskDeadline = "--/--/----"
+
                                 isAddingTask = false
                             },
                             colors = ButtonColors(
@@ -442,7 +451,12 @@ fun TasksScreen(projectName: String, projectId: Int, clientId: Int, viewModel: H
     // add task
     if (isEditingTask) {
         Dialog(
-            onDismissRequest = { isEditingTask = false }
+            onDismissRequest = {
+                tempTaskName = ""
+                tempTaskDeadline = "--/--/----"
+
+                isEditingTask = false
+            }
         ) {
             Surface(
                 color = Color.White,
@@ -502,6 +516,9 @@ fun TasksScreen(projectName: String, projectId: Int, clientId: Int, viewModel: H
                     ) {
                         Button(
                             onClick = {
+                                tempTaskName = ""
+                                tempTaskDeadline = "--/--/----"
+
                                 isEditingTask = false
                             },
                             colors = ButtonColors(

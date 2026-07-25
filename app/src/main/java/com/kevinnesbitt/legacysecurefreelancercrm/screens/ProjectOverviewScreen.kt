@@ -77,6 +77,7 @@ import com.kevinnesbitt.legacysecurefreelancercrm.variables.BillingType
 
 @Composable
 fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hubTab: String, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
     val clientState = viewModel.clientState.collectAsStateWithLifecycle().value.find { clientId == it.id }
     val project = clientState?.projects?.find { projectId == it.id }
     val currentTab = hubTab.replaceRange(0, 1, hubTab[0].uppercase())
@@ -91,7 +92,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
     val selectedDate = datePickerState.selectedDateMillis?.let {
-        convertMillisToDate(it)
+        convertMillisToDate(it, settings)
     } ?: ""
 
     var tempProjectTitle by remember {
@@ -791,7 +792,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             OutlinedTextField(
-                                value = selectedDate,
+                                value = tempProjectDeadline,
                                 onValueChange = { },
                                 label = { Text("Project Deadline") },
                                 readOnly = true,
@@ -928,6 +929,14 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                     ) {
                         Button(
                             onClick = {
+                                tempProjectTitle = ""
+                                tempProjectDescription = ""
+                                tempProjectBudget = 0.0
+                                tempProjectRate = 0.0
+                                tempProjectDeadline = "--/--/----"
+                                tempProjectBillingType = ""
+                                tempProjectStatus = ""
+
                                 editProjectInfo = false
                             },
                             colors = ButtonColors(

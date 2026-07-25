@@ -21,6 +21,7 @@ import kotlinx.coroutines.internal.synchronized
 data class ClientDataEntity(
     @PrimaryKey(autoGenerate = true) val id: Int,
     val name: String,
+    val company: String,
     val email: String,
     val telp: String,
     val currency: String,
@@ -101,6 +102,7 @@ data class SettingsEntity(
     val isTiming: Boolean = false,
     // val isPaused: Boolean = false,
     val timeFormat: String = "12-Hour",
+    val dateFormat: String = "MM/dd/yyyy",
     val selfName: String = "",
     val selfAddress: String = "",
     val selfEmail: String = "",
@@ -157,8 +159,8 @@ interface AppDao {
     suspend fun getSettingsOnce(): SettingsEntity?
 
     // UPDATE QUERIES
-    @Query("UPDATE clients SET name = :newName, email = :newEmail, telp = :newNum, currency = :newCurrency WHERE id = :clientId")
-    suspend fun updateClientInfo(clientId: Int, newName: String, newEmail: String, newNum: String, newCurrency: String)
+    @Query("UPDATE clients SET name = :newName, company = :company, email = :newEmail, telp = :newNum, currency = :newCurrency WHERE id = :clientId")
+    suspend fun updateClientInfo(clientId: Int, newName: String, company: String, newEmail: String, newNum: String, newCurrency: String)
 
     @Query("UPDATE projects SET title = :newTitle, description = :newDesc, deadline = :newDeadline, payRate = :newPayrate, billingType = :newBT, budget = :newBudget WHERE id = :projectId")
     suspend fun updateProjectInfo(projectId: Int, newTitle: String, newDesc: String, newDeadline: String, newPayrate: Double, newBT: String, newBudget: Double)
@@ -202,9 +204,10 @@ interface AppDao {
     @Query("UPDATE invoices SET status = :status WHERE id = :invoiceId")
     suspend fun updateInvoiceStatus(invoiceId: Int, status: String)
 
-    @Query("UPDATE settings SET timeFormat = :timeFormat, selfName = :selfName, selfAddress = :selfAddress, selfEmail = :selfEmail, selfTelephone = :selfTelephone WHERE id = 1")
+    @Query("UPDATE settings SET timeFormat = :timeFormat, dateFormat = :dateFormat, selfName = :selfName, selfAddress = :selfAddress, selfEmail = :selfEmail, selfTelephone = :selfTelephone WHERE id = 1")
     suspend fun updateSettings(
         timeFormat: String,
+        dateFormat: String,
         selfName: String,
         selfAddress: String,
         selfEmail: String,
@@ -274,7 +277,7 @@ interface AppDao {
         ItemEntity::class,
         SettingsEntity::class
                          ],
-        version = 29
+        version = 31
     )
     abstract class AppDatabase : RoomDatabase() {
         abstract fun appDao(): AppDao

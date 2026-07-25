@@ -1,6 +1,8 @@
 package com.kevinnesbitt.legacysecurefreelancercrm.screens
 
+import android.widget.Button
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -33,6 +36,8 @@ import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
@@ -49,10 +54,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
@@ -70,11 +77,17 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
+import com.kevinnesbitt.legacysecurefreelancercrm.util.DialogBox
 import com.kevinnesbitt.legacysecurefreelancercrm.util.DialogBoxSkeleton
 import com.kevinnesbitt.legacysecurefreelancercrm.util.convertMillisToDate
 import com.kevinnesbitt.legacysecurefreelancercrm.util.sharePdf
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.InvoiceStatus
 import kotlinx.coroutines.launch
+import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
@@ -85,6 +98,8 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
     val client = viewModel.clientState.collectAsStateWithLifecycle().value.find { it.id == clientId }
     val project = client?.projects?.find { it.id == projectId }
     val items by viewModel.items.collectAsStateWithLifecycle()
+    val tasks  = project?.tasks?: emptyList()
+    val timeLogs = project?.timeLogs?: emptyList()
 
     val windowInfo = LocalWindowInfo.current
     val screenWidth = windowInfo.containerDpSize.width
@@ -92,17 +107,27 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
 
     var localInvoices by remember(project) { mutableStateOf(project?.invoices?: emptyList()) }
 
+    val currentDate = LocalDate.now()
+    val formatter = DateTimeFormatter.ofPattern(settings.dateFormat, Locale.getDefault())
+    val currentDateStr = formatter.format(currentDate)
+
+    localInvoices.filter { invoice ->
+        currentDateStr > invoice.dueDate
+    }.forEach { dueInvoice ->
+        viewModel.updateInvoiceStatus(dueInvoice.id, InvoiceStatus.OVERDUE.name)
+    }
+
     val lazyListState = rememberLazyListState()
     val lazyListStateTwo = rememberLazyListState()
 
     val issueDatePickerState = rememberDatePickerState()
     val selectedIssueDate = issueDatePickerState.selectedDateMillis?.let {
-        convertMillisToDate(it)
+        convertMillisToDate(it, settings)
     } ?: ""
 
     val dueDatePickerState = rememberDatePickerState()
     val selectedDueDate = dueDatePickerState.selectedDateMillis?.let {
-        convertMillisToDate(it)
+        convertMillisToDate(it, settings)
     } ?: ""
 
     val currencySymbol = when(client?.currency?: "Unknown") {
@@ -123,7 +148,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
     var tempClientName by remember(client) { mutableStateOf(client?.name?: "") }
     var tempClientEmail by remember(client) { mutableStateOf(client?.email?: "") }
     var tempClientTelephone by remember(client) { mutableStateOf(client?.telp?: "") }
-    var tempClientCompanyORAddress by remember { mutableStateOf("") }
+    var tempClientCompanyORAddress by remember(client) { mutableStateOf(client?.company?: "") }
 
     var tempSelfName by remember(settings) { mutableStateOf(settings.selfName) }
     var tempSelfAddress by remember(settings) { mutableStateOf(settings.selfAddress) }
@@ -139,9 +164,14 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
     var tempPrice by remember { mutableDoubleStateOf(0.0) }
     var tempQuantity by remember { mutableIntStateOf(0) }
 
+    var tempTaskPrice by remember { mutableDoubleStateOf(0.0) }
+    var tempTaskName by remember { mutableStateOf("") }
+
     var expandInvoiceOptions by remember { mutableStateOf<Int?>(null) }
     var expandItemOptions by remember { mutableStateOf<Int?>(null) }
     var expandInvoiceStatusOptions by remember { mutableStateOf<Int?>(null) }
+
+    var checkedLogs = remember { mutableStateListOf<Int>() }
 
     var isAddingInvoice by remember { mutableStateOf(false) }
     var isEditingInvoice by remember { mutableStateOf(false) }
@@ -149,6 +179,10 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
     var showDueDatePicker by remember { mutableStateOf(false) }
     var isAddingItem by remember { mutableStateOf(false) }
     var showNameLengthWarningDialog by remember { mutableStateOf(false) }
+    var expandPickItemsOptions by remember { mutableStateOf(false) }
+    var showTasksDialog by remember { mutableStateOf(false) }
+    var showTimeLogsDialog by remember { mutableStateOf(false) }
+    var showPriceDialog by remember { mutableStateOf(false) }
 
     val invoiceItems = items.filter { it.invoiceId == tempInvoiceId }
 
@@ -343,6 +377,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                         DropdownMenuItem(
                             text = { Text("Generate PDF") },
                             onClick = {
+                                val itemsForThisInvoice = items.filter { it.invoiceId == invoice.id }
 
                                 val invoice = localInvoices.find { it.id == invoice.id }?: HomeViewModel.InvoiceData(
                                     0, 0, "", 0.0, "", "", "", "", "", "", "", "", "", "", "", 0.0, emptyList()
@@ -350,7 +385,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
 
                                 val uri = HomeViewModel.InvoicePdfGenerator.generate(
                                     context = context,
-                                    invoice = invoice.copy(items = invoiceItems),
+                                    invoice = invoice.copy(items = itemsForThisInvoice),
                                     signatureText = invoice.payTo // or null if you don't want a signature
                                 )
 
@@ -723,23 +758,75 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                             Icon(
                                 imageVector = Icons.Default.Percent,
                                 tint = Color.Black,
-                                modifier = Modifier.size(25.dp),
+                                modifier = Modifier.size(20.dp),
                                 contentDescription = "Tax Percentage"
                             )
                         },
                         modifier = Modifier.padding(all = padding)
                     )
 
-                    Text(
-                        text = "Items",
-                        fontSize = 20.sp,
-                        fontWeight = Bold,
-                        color = Color.Black,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 17.dp),
-                        textAlign = TextAlign.Start
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Items",
+                            fontSize = 20.sp,
+                            fontWeight = Bold,
+                            color = Color.Black,
+                            modifier = Modifier.padding(top = 17.dp),
+                            textAlign = TextAlign.Start
+                        )
+
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable(
+                                onClick = {
+                                    expandPickItemsOptions = true
+                                }
+                            )
+                        ) {
+                            DropdownMenu(
+                                expanded = expandPickItemsOptions,
+                                onDismissRequest = { expandPickItemsOptions = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Time Logs") },
+                                    onClick = {
+                                        showTimeLogsDialog = true
+                                        expandPickItemsOptions = false
+                                    }
+                                )
+
+                                DropdownMenuItem(
+                                    text = { Text("Tasks") },
+                                    onClick = {
+                                        showTasksDialog = true
+                                        expandPickItemsOptions = false
+                                    }
+                                )
+                            }
+
+                            val angle by animateFloatAsState(
+                                targetValue = if (expandPickItemsOptions) -90f else 0f,
+                                label = "IconRotationAnimation"
+                            )
+
+                            Text(
+                                text = "Select From",
+                                fontSize = 17.sp,
+                                color = Color.DarkGray
+                            )
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowLeft,
+                                contentDescription = "Select From",
+                                tint = Color.Black,
+                                modifier = Modifier.rotate(angle)
+                            )
+                        }
+                    }
 
                     HorizontalDivider(thickness = 1.dp, color = Color.LightGray)
 
@@ -783,11 +870,19 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                         modifier = Modifier.padding(end = 8.dp)
                                     )
 
-                                    Text(
-                                        text = "Quantity: ${item.quantity}",
-                                        fontSize = 14.sp,
-                                        color = Color.Gray
-                                    )
+                                    if (item.quantity != 0) {
+                                        Text(
+                                            text = "Quantity: ${item.quantity}",
+                                            fontSize = 14.sp,
+                                            color = Color.Gray
+                                        )
+                                    } else {
+                                        Text(
+                                            text = "Quantity: 0",
+                                            fontSize = 14.sp,
+                                            color = Color.White
+                                        )
+                                    }
                                 }
                             }
 
@@ -1264,4 +1359,306 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
         }
     }
 
+    if (showTasksDialog) {
+        DialogBox(
+            title = "Completed Tasks",
+            width = 550.dp,
+            height = 300.dp,
+            onDismissRequest = { showTasksDialog = false }
+        ) {
+            val lazyColumnState = rememberLazyListState()
+
+            HorizontalDivider(thickness = 1.dp, color = Color.Gray)
+            LazyColumn(
+                state = lazyColumnState,
+                modifier = Modifier.height(200.dp)
+            ) {
+                items(tasks, key = { it.id }) { task ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Start,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = {
+                                tempTaskName = task.description
+
+                                showPriceDialog = true
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                contentColor = Color.Black,
+                                containerColor = Color.White
+                            )
+                        ) {
+                            Text(
+                                text = "Add",
+                                fontSize = 17.sp,
+                                fontWeight = Bold,
+                                color = Color.Black
+                            )
+                        }
+                        Text(
+                            text = task.description,
+                            fontSize = 17.sp,
+                            color = Color.Black,
+                            modifier = Modifier.padding(all = 8.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    if (showPriceDialog) {
+        DialogBox(
+            onDismissRequest = {
+                tempTaskPrice = 0.0
+                showPriceDialog = false
+            },
+            title = "Enter Price",
+            buttonRow = {
+                Button(
+                    onClick = {
+                        tempTaskPrice = 0.0
+                        tempTaskName = ""
+
+                        showPriceDialog = false
+                    },
+                    colors = ButtonColors(
+                        contentColor = Color.Black,
+                        containerColor = Color.LightGray,
+                        disabledContentColor = Color.Black,
+                        disabledContainerColor = Color.LightGray
+                    )
+                ) {
+                    Text(
+                        text = "Cancel",
+                        fontSize = 14.sp,
+                        fontWeight = Bold,
+                        color = Color.Black
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        val currentTaskName = tempTaskName
+                        val currentTaskPrice = tempTaskPrice
+
+                        coroutineScope.launch {
+                            viewModel.createItem(
+                                invoiceId = tempInvoiceId,
+                                name = currentTaskName,
+                                quantity = 0,
+                                price = currentTaskPrice
+                            )
+                        }
+
+                        tempTaskPrice = 0.0
+                        tempTaskName = ""
+
+                        showPriceDialog = false
+                    },
+                    colors = ButtonColors(
+                        contentColor = Color.Black,
+                        containerColor = Color.Cyan,
+                        disabledContentColor = Color.Black,
+                        disabledContainerColor = Color.Cyan
+                    )
+                ) {
+                    Text(
+                        text = "Confirm",
+                        fontSize = 14.sp,
+                        fontWeight = Bold,
+                        color = Color.Black
+                    )
+                }
+            }
+        ) {
+            OutlinedTextField(
+                value = if (tempTaskPrice == 0.0) "" else tempTaskPrice.toString(),
+                onValueChange = { text ->
+                    val isValidDecimal = text.count { it == '.' } <= 1 &&
+                            text.all { it.isDigit() || it == '.' }
+                    if (isValidDecimal) {
+                        tempTaskPrice = text.toDouble()
+                    }
+                },
+                label = { Text("Price") },
+                modifier = Modifier.width(400.dp),
+                leadingIcon = {
+                    Text(currencySymbol)
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
+        }
+    }
+
+    if (showTimeLogsDialog) {
+        DialogBox(
+            onDismissRequest = {
+                checkedLogs.clear()
+
+                showTimeLogsDialog = false
+            },
+            title = "Time Logs",
+            width = 550.dp,
+            height = 400.dp,
+            buttonRow = {
+                Button(
+                    onClick = {
+                        checkedLogs.clear()
+
+                        showTimeLogsDialog = false
+                    },
+                    colors = ButtonColors(
+                        contentColor = Color.Black,
+                        containerColor = Color.LightGray,
+                        disabledContentColor = Color.Black,
+                        disabledContainerColor = Color.LightGray
+                    )
+                ) {
+                    Text(
+                        text = "Cancel",
+                        fontSize = 14.sp,
+                        fontWeight = Bold,
+                        color = Color.Black
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        var totalPrice = 0.0
+                        checkedLogs.forEach { logId ->
+                            val log = timeLogs.find { it.id == logId }
+                            if (log != null) {
+                                val endTime = LocalTime.ofNanoOfDay(log.endTime)
+                                val startTime = LocalTime.ofNanoOfDay(log.startTime)
+                                val totalTime = when {
+                                    startTime.toNanoOfDay() < endTime.toNanoOfDay() -> {
+                                        Duration.between(startTime, endTime).toHours()
+                                    }
+                                    else -> {
+                                        Duration.between(startTime, endTime).toHours() + 23
+                                    }
+                                }
+
+                                val logPrice = totalTime * (project?.payRate?: 1.0)
+
+                                totalPrice += logPrice
+                            }
+                        }
+
+                        coroutineScope.launch {
+                            viewModel.createItem(
+                                invoiceId = tempInvoiceId,
+                                name = "Labor",
+                                quantity = 0,
+                                price = totalPrice
+                            )
+                        }
+
+                        checkedLogs.clear()
+
+                        showTimeLogsDialog = false
+                    },
+                    colors = ButtonColors(
+                        contentColor = Color.Black,
+                        containerColor = Color.Cyan,
+                        disabledContentColor = Color.Black,
+                        disabledContainerColor = Color.Cyan
+                    )
+                ) {
+                    Text(
+                        text = "Confirm",
+                        fontSize = 14.sp,
+                        fontWeight = Bold,
+                        color = Color.Black
+                    )
+                }
+            }
+        ) {
+            val lazyColumnState = rememberLazyListState()
+
+            HorizontalDivider(thickness = 1.dp, color = Color.Gray)
+            LazyColumn(
+                state = lazyColumnState,
+                modifier = Modifier.height(260.dp)
+            ) {
+                items(timeLogs, key = { it.id }) { log ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val checked = checkedLogs.contains(log.id)
+
+                        Checkbox(
+                            checked = checked,
+                            onCheckedChange = {
+                                if (checkedLogs.contains(log.id)) {
+                                    checkedLogs.remove(log.id)
+                                } else {
+                                    checkedLogs.add(log.id)
+                                }
+                                android.util.Log.d("Checkbox", "checkedLogs = $checkedLogs")
+                            },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = Color.Cyan,
+                                checkmarkColor = Color.Black
+                            )
+                        )
+
+                        val formatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())
+                        val startTimeObj = LocalTime.ofNanoOfDay(log.startTime)
+                        val endTimeObj = LocalTime.ofNanoOfDay(log.endTime)
+
+                        val startTimeStr = when {
+                            settings.timeFormat == "12-Hour" -> {
+                                startTimeObj.format(formatter)
+                            }
+                            else -> {
+                                val startHour = startTimeObj.hour
+                                val startMinute = startTimeObj.minute
+
+                                "$startHour:$startMinute"
+                            }
+                        }
+
+                        val endTimeStr = when {
+                            settings.timeFormat == "12-Hour" -> {
+                                endTimeObj.format(formatter)
+                            }
+                            else -> {
+                                val endHour = endTimeObj.hour
+                                val endMinute = endTimeObj.minute
+
+                                "$endHour:$endMinute"
+                            }
+                        }
+
+                        Text(
+                            text = startTimeStr,
+                            fontSize = 14.sp,
+                            color = Color.Black
+                        )
+
+                        Text(
+                            text = endTimeStr,
+                            fontSize = 14.sp,
+                            color = Color.Black
+                        )
+
+                        Text(
+                            text = log.date,
+                            fontSize = 14.sp,
+                            color = Color.Black
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

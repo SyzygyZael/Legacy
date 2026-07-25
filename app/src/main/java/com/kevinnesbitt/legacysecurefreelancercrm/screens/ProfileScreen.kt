@@ -112,6 +112,7 @@ fun ProfileScreen(viewModel: HomeViewModel, navController: NavController, innerP
                     onClick = {
                         viewModel.updateSettings(
                             timeFormat = settings.timeFormat,
+                            dateFormat = settings.dateFormat,
                             selfName = tempName,
                             selfAddress = tempAddress,
                             selfEmail = tempEmail,

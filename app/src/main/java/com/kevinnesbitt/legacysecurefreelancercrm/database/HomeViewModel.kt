@@ -30,6 +30,7 @@ import android.os.Build
 import androidx.compose.runtime.State
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import kotlin.math.log
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -55,9 +56,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         flow5 = dao.getAllClients()
     ) { projects, tasks, timeLogs, invoices, clients ->
         clients.map { client ->
+            android.util.Log.d("Client Company", "Client Company: ${client.company}")
             ClientData(
                 id = client.id,
                 name = client.name,
+                company = client.company,
                 email = client.email,
                 telp = client.telp,
                 currency = client.currency,
@@ -210,6 +213,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateSettings(
         timeFormat: String,
+        dateFormat: String,
         selfName: String,
         selfAddress: String,
         selfEmail: String,
@@ -218,6 +222,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             dao.updateSettings(
                 timeFormat = timeFormat,
+                dateFormat = dateFormat,
                 selfName = selfName,
                 selfAddress = selfAddress,
                 selfTelephone = selfTelephone,
@@ -226,7 +231,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun createClient(name: String, email: String, telp: String, currency: String) {
+    fun createClient(name: String, company: String, email: String, telp: String, currency: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val currentClientsCount = dao.getAllClientsList().size
 
@@ -234,6 +239,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 ClientDataEntity(
                     id = 0,
                     name = name,
+                    company = company,
                     email = email,
                     telp = telp,
                     currency = currency,
@@ -494,9 +500,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun updateClientInfo(clientId: Int, newName: String, newEmail: String, newTelp: String, newCurrency: String) {
+    fun updateClientInfo(clientId: Int, newName: String, company: String, newEmail: String, newTelp: String, newCurrency: String) {
         viewModelScope.launch {
-            dao.updateClientInfo(clientId, newName, newEmail, newTelp, newCurrency)
+            dao.updateClientInfo(clientId, newName, company, newEmail, newTelp, newCurrency)
         }
     }
 
@@ -765,12 +771,24 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
             var subtotal = 0.0
             invoice.items.forEach { item ->
-                val lineTotal = item.price * item.quantity
+                val multiplier = when(item.quantity) {
+                    0 -> 1
+                    -1 -> 1
+                    else -> item.quantity
+                }
+
+                val quantityType = when(item.quantity) {
+                    0 -> "-"
+                    -1 -> "-"
+                    else -> item.quantity.toString()
+                }
+
+                val lineTotal = item.price * multiplier
                 subtotal += lineTotal
 
                 canvas.drawText(item.name, descX, y, bodyPaint)
                 drawRightAlignedText(canvas, moneyFormat.format(item.price), priceX + 40f, y, bodyPaint)
-                drawRightAlignedText(canvas, item.quantity.toString(), qtyX + 10f, y, bodyPaint)
+                drawRightAlignedText(canvas, quantityType, qtyX + 10f, y, bodyPaint)
                 drawRightAlignedText(canvas, moneyFormat.format(lineTotal), totalX, y, bodyPaint)
 
                 y += 16f
@@ -845,6 +863,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     data class ClientData(
         val id: Int,
         val name: String,
+        val company: String,
         val email: String,
         val telp: String,
         val currency: String,
