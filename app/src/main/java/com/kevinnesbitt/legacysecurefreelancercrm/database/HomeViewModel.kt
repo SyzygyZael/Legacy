@@ -1,7 +1,6 @@
 package com.kevinnesbitt.legacysecurefreelancercrm.database
 
 import android.app.Application
-import android.content.ClipData
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -26,15 +25,18 @@ import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import java.util.Locale
 import android.graphics.*
-import android.os.Build
-import androidx.compose.runtime.State
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kevinnesbitt.legacysecurefreelancercrm.variables.InvoiceStatus
+import com.kevinnesbitt.legacysecurefreelancercrm.variables.SupportedCurrency
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import kotlin.math.log
+import java.nio.DoubleBuffer
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val dao = AppDao.AppDatabase.getDatabase(application).appDao()
+    val dao = AppDao.AppDatabase.getDatabase(application).appDao()
 
     init {
         viewModelScope.launch {
@@ -104,7 +106,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                             invoices = invoices
                                 .filter { it.projectId == project.id }
                                 .map { invoice ->
-                                    android.util.Log.d("Invoice on Invoice Data Creation", "invoice: $invoice")
                                     InvoiceData(
                                         id = invoice.id,
                                         projectId = invoice.projectId,
@@ -133,13 +134,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     // Combined Pipeline: Seamlessly merges independent Room tables down into 1 state object
     val uiState: StateFlow<DashboardUiState> = combine(
+        dao.getAllClients(),
         dao.getAllInvoices(),
         dao.getAllTasks(),
-        dao.getAllTimeLogs(),
         dao.getAllProjects()
-    ) { invoices, tasks, timeLogs, projects ->
+    ) { clients, invoices, tasks, projects ->
 
-        // 🗓️ Calculate Epoch timestamp ranges for the current active calendar month
+        // Calculate Epoch timestamp ranges for the current active calendar month
         val calendar = Calendar.getInstance()
         calendar.set(Calendar.DAY_OF_MONTH, 1)
         calendar.set(Calendar.HOUR_OF_DAY, 0)
@@ -147,46 +148,56 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         calendar.set(Calendar.SECOND, 0)
         val startOfMonthMs = calendar.timeInMillis
 
-        // 💵 Metric A: Active Month Earnings (Paid Invoices generated/marked within this month)
+        // Active Month Earnings (Paid Invoices generated/marked within this month)
         val monthlyEarnings = invoices
-            .filter { it.status.equals("Paid", ignoreCase = true) && it.issueDate >= startOfMonthMs.toString() }
+            .filter { it.status.equals(InvoiceStatus.PAID.name, ignoreCase = true) && it.issueDate >= startOfMonthMs.toString() }
             .sumOf { it.amount }
 
-        // 📁 Metric B: Outstanding/Pending Accounts Receivables (Sent but unpaid)
+        // Outstanding/Pending Accounts Receivables (Sent but unpaid)
         val pendingAmount = invoices
-            .filter { it.status.equals("Sent", ignoreCase = true) }
+            .filter { it.status.equals(InvoiceStatus.SENT.name, ignoreCase = true) }
 
-        // 🛑 Filter C: Overdue Invoices lists
+        // All Time Earnings
+        var totalEarnings = 0.0
+
+        invoices.filter { invoice -> invoice.status == InvoiceStatus.PAID.name }
+            .forEach { paidInvoice ->
+                val thisProject = dao.getProjectFromId(paidInvoice.projectId)
+                val thisClient = dao.getClientFromId(thisProject.clientId)
+                val toDollarConversion = SupportedCurrency.entries.find { it.code == thisClient.currency }?.USDConversion?: 0f
+                val toTargetCurrencyConversion = SupportedCurrency.entries.find { it.code == settings.value.preferredCurrency }?.USDConversion?: 0f
+
+                totalEarnings += (paidInvoice.amount / toDollarConversion) * toTargetCurrencyConversion
+
+                android.util.Log.d(
+                    "Fuck shit",
+                    "project: $thisProject\nclient: $thisClient\ndollar: $toDollarConversion\ntarget: $toTargetCurrencyConversion\ntotal: $totalEarnings\ninvoice: $paidInvoice"
+                )
+            }
+
+        // Overdue Invoices lists
         val currentTime = System.currentTimeMillis()
         val overdueList = invoices.filter {
             it.status.equals("Sent", ignoreCase = true) && it.dueDate < currentTime.toString()
         }
 
-        // ⏱️ Find any active running timer log (where endTime is not logged yet)
-        val activeTimer = timeLogs.find { it.endTime == 0L }
-        val boundProject = activeTimer?.let { timer ->
-            projects.find { it.id == timer.projectId }?.title
-        }
-
-        // 📋 Urgent Tasks Filter (Incomplete tasks sorted sequentially by closest due date)
+        // Urgent Tasks Filter (Incomplete tasks sorted sequentially by closest due date)
         val urgentTasks = tasks
             .filter { !it.isCompleted }
             .sortedBy { it.dueDate }
             .take(5) // Don't overwhelm dashboard; keep it tight to top 5 priorities
 
         DashboardUiState(
-            isLoading = false,
             activeEarningsThisMonth = monthlyEarnings,
             pendingInvoices = pendingAmount.size,
-            runningTimer = activeTimer,
-            activeProjectTitle = boundProject ?: "No Active Session",
             highPriorityTasks = urgentTasks,
-            overdueInvoices = overdueList
+            overdueInvoices = overdueList,
+            totalEarnings = totalEarnings
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000), // Clean resource loop on activity teardowns
-        initialValue = DashboardUiState(isLoading = true)
+        initialValue = DashboardUiState()
     )
 
     val items: StateFlow<List<ItemData>> = dao.getAllInvoiceItems().map { invoiceItems ->
@@ -217,7 +228,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         selfName: String,
         selfAddress: String,
         selfEmail: String,
-        selfTelephone: String
+        selfTelephone: String,
+        currency: String,
+        taxBracket: Double
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             dao.updateSettings(
@@ -226,7 +239,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 selfName = selfName,
                 selfAddress = selfAddress,
                 selfTelephone = selfTelephone,
-                selfEmail = selfEmail
+                selfEmail = selfEmail,
+                currency = currency,
+                taxBracket = taxBracket
             )
         }
     }
@@ -631,6 +646,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         fun generate(
             context: Context,
             invoice: InvoiceData,
+            currencySymbol: String,
             signatureText: String? = null,
             fileName: String = "invoice_${invoice.invoiceNumber}.pdf"
         ): Uri {
@@ -639,7 +655,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val page = document.startPage(pageInfo)
             val canvas = page.canvas
 
-            drawInvoice(canvas, invoice, signatureText)
+            drawInvoice(canvas, invoice, currencySymbol, signatureText)
 
             document.finishPage(page)
 
@@ -654,7 +670,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
-        private fun drawInvoice(canvas: Canvas, invoice: InvoiceData, signatureText: String?) {
+        private fun drawInvoice(canvas: Canvas, invoice: InvoiceData, currencySymbol: String, signatureText: String?) {
             val thinLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.BLACK
                 strokeWidth = 0.8f
@@ -687,7 +703,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 typeface = Typeface.DEFAULT
             }
 
-            val moneyFormat = DecimalFormat("$#,##0.00")
+            val moneyFormat = DecimalFormat("${currencySymbol}#,##0.00")
             val percentFormat = DecimalFormat("0")
 
             var y = 85f
@@ -845,17 +861,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     // ─── Data Models ─────────────────────────────────────────────
 
     data class DashboardUiState(
-        val isLoading: Boolean = true,
-
-        // Financial Metric Row
         val activeEarningsThisMonth: Double = 0.0,
         val pendingInvoices: Int = 0,
-
-        // Persistent Stopwatch/Timer Tracker
-        val runningTimer: TimeLogsEntity? = null,
-        val activeProjectTitle: String? = null,
-
-        // Actionable Items lists
+        val totalEarnings: Double = 0.0,
         val highPriorityTasks: List<TaskDataEntity> = emptyList(),
         val overdueInvoices: List<InvoiceEntity> = emptyList()
     )

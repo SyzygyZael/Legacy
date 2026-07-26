@@ -106,7 +106,9 @@ data class SettingsEntity(
     val selfName: String = "",
     val selfAddress: String = "",
     val selfEmail: String = "",
-    val selfTelephone: String = ""
+    val selfTelephone: String = "",
+    val preferredCurrency: String = "USD",
+    val taxBracket: Double = 0.0
 )
 
 @Dao
@@ -204,14 +206,19 @@ interface AppDao {
     @Query("UPDATE invoices SET status = :status WHERE id = :invoiceId")
     suspend fun updateInvoiceStatus(invoiceId: Int, status: String)
 
-    @Query("UPDATE settings SET timeFormat = :timeFormat, dateFormat = :dateFormat, selfName = :selfName, selfAddress = :selfAddress, selfEmail = :selfEmail, selfTelephone = :selfTelephone WHERE id = 1")
+    @Query("UPDATE settings SET preferredCurrency = :currency WHERE id = 1")
+    suspend fun updatePreferredCurrency(currency: String)
+
+    @Query("UPDATE settings SET timeFormat = :timeFormat, dateFormat = :dateFormat, selfName = :selfName, selfAddress = :selfAddress, selfEmail = :selfEmail, selfTelephone = :selfTelephone, preferredCurrency = :currency, taxBracket = :taxBracket WHERE id = 1")
     suspend fun updateSettings(
         timeFormat: String,
         dateFormat: String,
         selfName: String,
         selfAddress: String,
         selfEmail: String,
-        selfTelephone: String
+        selfTelephone: String,
+        currency: String,
+        taxBracket: Double
     )
 
     // DELETE QUERIES
@@ -231,6 +238,9 @@ interface AppDao {
     @Query("SELECT * FROM projects WHERE clientId = :clientId")
     suspend fun getProjectFromClientId(clientId: Int): List<ProjectDataEntity>
 
+    @Query("SELECT * FROM projects WHERE id = :projectId")
+    suspend fun getProjectFromId(projectId: Int): ProjectDataEntity
+
     @Query("SELECT * FROM tasks WHERE projectId = :projectId")
     suspend fun getTasksFromProjectId(projectId: Int): List<TaskDataEntity>
 
@@ -242,6 +252,12 @@ interface AppDao {
 
     @Query("SELECT * FROM invoices WHERE id = :invoiceId")
     suspend fun getInvoice(invoiceId: Int): InvoiceEntity
+
+    @Query("SELECT * FROM invoice_item WHERE invoiceId = :invoiceId")
+    suspend fun getItemsFromInvoice(invoiceId: Int): List<ItemEntity>
+
+    @Query("SELECT * FROM clients WHERE id = :clientId")
+    suspend fun getClientFromId(clientId: Int): ClientDataEntity
 
     // TIMER QUERIES
     @Query("UPDATE settings SET isTiming = :timeState WHERE id = 1")
@@ -277,7 +293,7 @@ interface AppDao {
         ItemEntity::class,
         SettingsEntity::class
                          ],
-        version = 31
+        version = 33
     )
     abstract class AppDatabase : RoomDatabase() {
         abstract fun appDao(): AppDao

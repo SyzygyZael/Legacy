@@ -65,12 +65,19 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
+import com.kevinnesbitt.legacysecurefreelancercrm.util.DropdownSettingsRow
+import com.kevinnesbitt.legacysecurefreelancercrm.util.TextDropDown
 import com.kevinnesbitt.legacysecurefreelancercrm.util.convertMillisToDate
+import com.kevinnesbitt.legacysecurefreelancercrm.util.getCurrencyName
+import com.kevinnesbitt.legacysecurefreelancercrm.util.getCurrencySymbol
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.BillingType
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.ProjectStatus
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.SupportedCurrency
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
@@ -82,13 +89,34 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
     val clientEmail = clientState?.email?: ""
     val clientPhoneNum = clientState?.telp?: ""
     val clientProjects = clientState?.projects?: emptyList()
-    val clientCurrency = clientState?.currency?: ""
+    val clientCurrency = clientState?.currency?: "Unknown"
+    val currencySymbol = getCurrencySymbol(clientCurrency)
+    val currencyDisplayName = getCurrencyName(clientCurrency)
 
     val clients = viewModel.clientState.collectAsStateWithLifecycle().value
     val activeProjects = clients.flatMap { client ->
         client.projects.filter { it.status == ProjectStatus.ACTIVE.name }
     }
-    // ("Active Projects", "Num Active Projects: ${activeProjects.size}")
+
+    val currentDateObj = LocalDate.now()
+    val formatter = DateTimeFormatter.ofPattern(settings.dateFormat, Locale.getDefault())
+    val currentDateStr = formatter.format(currentDateObj)
+
+    clientProjects.forEach { project ->
+        if (currentDateStr > project.deadLine) {
+            viewModel.updateProjectStatus(
+                projectId = project.id,
+                clientId = clientId,
+                status = ProjectStatus.OVERDUE.name
+            )
+        } else if (project.status == ProjectStatus.OVERDUE.name) {
+            viewModel.updateProjectStatus(
+                projectId = project.id,
+                clientId = clientId,
+                status = ProjectStatus.PAUSED.name
+            )
+        }
+    }
 
 
     val windowInfo = LocalWindowInfo.current
@@ -121,6 +149,7 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
     var expandCurrencyChoice by remember { mutableStateOf(false) }
     var expandBillingTypeChoice by remember { mutableStateOf(false) }
     var isAddingProject by remember { mutableStateOf(false) }
+    var expandProjectStatusOptions by remember { mutableStateOf<Int?>(null) }
 
     var tempProjectTitle by remember { mutableStateOf("") }
     var tempProjectDescription by remember { mutableStateOf("") }
@@ -170,7 +199,7 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                         color = Color.DarkGray
                     )
                     Text(
-                        text = "Currency: $clientCurrency",
+                        text = "Currency: $currencyDisplayName",
                         fontSize = 18.sp,
                         color = Color.DarkGray
                     )
@@ -448,7 +477,7 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                                         )
 
                                         Text(
-                                            text = project.deadLine,
+                                            text = "Deadline: ${project.deadLine}",
                                             fontSize = 15.sp,
                                             color = Color.Gray
                                         )
@@ -457,79 +486,85 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
 
                                 var statusColor: Color = Color.White
                                 when (project.status) {
-                                    "ARCHIVED" -> statusColor = Color.Red
+                                    "ARCHIVED" -> statusColor = Color(0xFFFF7518L)
                                     "PAUSED" -> statusColor = Color.Gray
                                     "ACTIVE" -> statusColor = Color.Green
+                                    "OVERDUE" -> statusColor = Color.Red
                                 }
 
-                                Text(
+                                TextDropDown(
+                                    expanded = expandProjectStatusOptions == project.id,
+                                    onDismissRequest = { expandProjectStatusOptions = null },
+                                    onClick = {
+                                        expandProjectStatusOptions = project.id
+                                    },
                                     text = project.status,
-                                    fontSize = 22.sp,
-                                    color = statusColor
-                                )
+                                    color = statusColor,
+                                    fontSize = 22.sp
+                                ) {
+                                    if (project.status != ProjectStatus.ARCHIVED.name) {
+                                        DropdownMenuItem(
+                                            text = { Text("Archive") },
+                                            onClick = {
+                                                viewModel.updateProjectStatus(
+                                                    ProjectStatus.ARCHIVED.name,
+                                                    project.id,
+                                                    clientId
+                                                )
+
+                                                expandProjectStatusOptions = null
+                                            }
+                                        )
+                                    }
+
+                                    if (project.status != ProjectStatus.PAUSED.name) {
+                                        DropdownMenuItem(
+                                            text = { Text("Pause") },
+                                            onClick = {
+                                                viewModel.updateProjectStatus(
+                                                    ProjectStatus.PAUSED.name,
+                                                    project.id,
+                                                    clientId
+                                                )
+
+                                                expandProjectStatusOptions = null
+                                            }
+                                        )
+                                    }
+
+                                    if (project.status != ProjectStatus.ACTIVE.name) {
+                                        DropdownMenuItem(
+                                            text = { Text("Active") },
+                                            onClick = {
+                                                if (activeProjects.isNotEmpty()) {
+                                                    // ("Active Projects", "Num Active Projects: ${activeProjects.size}")
+                                                    activeProjects.forEach { activeProject ->
+                                                        viewModel.updateProjectStatus(
+                                                            clientId = activeProject.clientId,
+                                                            projectId = activeProject.id,
+                                                            status = ProjectStatus.PAUSED.name
+                                                        )
+                                                    }
+                                                }
+                                                // ("Active Projects", "Num Active Projects: ${activeProjects.size}")
+
+                                                viewModel.updateProjectStatus(
+                                                    ProjectStatus.ACTIVE.name,
+                                                    project.id,
+                                                    clientId
+                                                )
+
+                                                expandProjectStatusOptions = null
+                                            }
+                                        )
+                                    }
+                                }
                             }
 
                             DropdownMenu(
                                 expanded = expandProjectOptions == project.id,
                                 onDismissRequest = { expandProjectOptions = null }
                             ) {
-                                if (project.status != ProjectStatus.ARCHIVED.name) {
-                                    DropdownMenuItem(
-                                        text = { Text("Archive") },
-                                        onClick = {
-                                            viewModel.updateProjectStatus(
-                                                ProjectStatus.ARCHIVED.name,
-                                                project.id,
-                                                clientId
-                                            )
-
-                                            expandProjectOptions = null
-                                        }
-                                    )
-                                }
-
-                                if (project.status != ProjectStatus.PAUSED.name) {
-                                    DropdownMenuItem(
-                                        text = { Text("Pause") },
-                                        onClick = {
-                                            viewModel.updateProjectStatus(
-                                                ProjectStatus.PAUSED.name,
-                                                project.id,
-                                                clientId
-                                            )
-
-                                            expandProjectOptions = null
-                                        }
-                                    )
-                                }
-
-                                if (project.status != ProjectStatus.ACTIVE.name) {
-                                    DropdownMenuItem(
-                                        text = { Text("Active") },
-                                        onClick = {
-                                            if (activeProjects.isNotEmpty()) {
-                                                // ("Active Projects", "Num Active Projects: ${activeProjects.size}")
-                                                activeProjects.forEach { activeProject ->
-                                                    viewModel.updateProjectStatus(
-                                                        clientId = activeProject.clientId,
-                                                        projectId = activeProject.id,
-                                                        status = ProjectStatus.PAUSED.name
-                                                    )
-                                                }
-                                            }
-                                            // ("Active Projects", "Num Active Projects: ${activeProjects.size}")
-
-                                            viewModel.updateProjectStatus(
-                                                ProjectStatus.ACTIVE.name,
-                                                project.id,
-                                                clientId
-                                            )
-
-                                            expandProjectOptions = null
-                                        }
-                                    )
-                                }
-
                                 DropdownMenuItem(
                                     text = { Text("Move") },
                                     onClick = {
@@ -956,7 +991,10 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                             .fillMaxWidth()
                             .padding(5.dp),
                         textStyle = TextStyle(fontSize = 20.sp),
-                        singleLine = true
+                        singleLine = true,
+                        leadingIcon = {
+                            Text(currencySymbol)
+                        }
                     )
 
                     HorizontalDivider(color = Color.White)
@@ -985,7 +1023,10 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                             .fillMaxWidth()
                             .padding(5.dp),
                         textStyle = TextStyle(fontSize = 20.sp),
-                        singleLine = true
+                        singleLine = true,
+                        leadingIcon = {
+                            Text(currencySymbol)
+                        }
                     )
 
                     HorizontalDivider(color = Color.White, thickness = 15.dp)

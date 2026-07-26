@@ -47,13 +47,15 @@ import androidx.compose.ui.text.font.FontWeight.Companion.Bold
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
 import com.kevinnesbitt.legacysecurefreelancercrm.util.DialogBoxSkeleton
+import com.kevinnesbitt.legacysecurefreelancercrm.util.InfoCard
 import com.kevinnesbitt.legacysecurefreelancercrm.util.TimerText
+import com.kevinnesbitt.legacysecurefreelancercrm.util.getCurrencySymbol
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.ProjectStatus
 import java.time.LocalTime
+import java.util.Locale
 
 @Composable
 fun HomeScreen(viewModel: HomeViewModel, innerPadding: PaddingValues) {
@@ -70,6 +72,8 @@ fun HomeScreen(viewModel: HomeViewModel, innerPadding: PaddingValues) {
     val allProjects = clientState.flatMap { client ->
         client.projects
     }
+
+    val currencySymbol = getCurrencySymbol(settings.preferredCurrency)
 
     val windowInfo = LocalWindowInfo.current
     val screenWidth = windowInfo.containerDpSize.width
@@ -139,137 +143,43 @@ fun HomeScreen(viewModel: HomeViewModel, innerPadding: PaddingValues) {
             itemVerticalAlignment = Alignment.CenterVertically
 
         ) {
-            // Active earnings
-            Card(
-                elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
-                shape = RoundedCornerShape(15.dp),
-                modifier = Modifier.padding(vertical = 8.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .size(width = 185.dp, height = 115.dp)
-                        .background(color = Color.White)
-                        .padding(5.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(5.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            modifier = Modifier
-                                .size(25.dp),
-                            shape = CircleShape,
-                            color = Color(0xFF00FFFFL).copy(alpha = 0.3f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.StackedLineChart,
-                                contentDescription = "Active Earnings",
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .padding(4.dp),
-                                tint = Color.Blue
-                            )
-                        }
-
-                        Text(
-                            text = " Active Earnings",
-                            fontSize = 12.sp,
-                            color = Color.Gray
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(5.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = uiState.activeEarningsThisMonth.toString(),
-                            fontSize = 30.sp,
-                            fontWeight = Bold,
-                            color = Color.Black
-                        )
-
-                        Surface(
-                            modifier = Modifier
-                                .size(52.dp, 20.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFF98FF98L).copy(alpha = 0.2f)
-                        ) {
-                            Text(
-                                text = "^ +0.0%",
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .padding(2.dp),
-                                color = Color(0xFF228B22L),
-                                textAlign = TextAlign.Center,
-                                fontWeight = Bold,
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-                }
-            }
+            // Total earnings
+            InfoCard(
+                title = "Total Earnings",
+                icon = Icons.Default.StackedLineChart,
+                iconTint = Color.Blue,
+                iconBackgroundColor = Color(0xFF00FFFFL).copy(alpha = 0.3f),
+                value = "${currencySymbol}${
+                    String.format(
+                        Locale.getDefault(),
+                        "%.2f",
+                        uiState.totalEarnings * ((100 - settings.taxBracket) / 100)
+                    )
+                }",
+                fontSize = 20.sp
+            )
 
             // Pending Invoices
-            Card(
-                elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
-                shape = RoundedCornerShape(15.dp),
-                modifier = Modifier.padding(vertical = 8.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .size(width = 185.dp, height = 115.dp)
-                        .background(color = Color.White)
-                        .padding(5.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(5.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            modifier = Modifier
-                                .size(25.dp),
-                            shape = CircleShape,
-                            color = Color(0xFF00FFFFL).copy(alpha = 0.3f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CurrencyExchange,
-                                contentDescription = "Pending Invoices",
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .padding(4.dp),
-                                tint = Color.Blue
-                            )
-                        }
-
-                        Text(
-                            text = " Pending Invoices",
-                            fontSize = 12.sp,
-                            color = Color.Gray
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(5.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = uiState.pendingInvoices.toString(),
-                            fontSize = 30.sp,
-                            fontWeight = Bold,
-                            color = Color.Black
-                        )
-                    }
-                }
-            }
+            InfoCard(
+                title = "Pending Invoices",
+                icon = Icons.Default.CurrencyExchange,
+                iconTint = Color.Blue,
+                iconBackgroundColor = Color(0xFF00FFFFL).copy(alpha = 0.3f),
+                value = uiState.pendingInvoices.toString(),
+                fontSize = 30.sp
+            )
 
             // Projects
+            InfoCard(
+                title = "Projects",
+                icon = Icons.Default.Book,
+                iconTint = Color.Blue,
+                iconBackgroundColor = Color(0xFF00FFFFL).copy(alpha = 0.3f),
+                value = "${allProjects.size}",
+                fontSize = 30.sp
+            )
+
+            // Timer
             Card(
                 elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
                 shape = RoundedCornerShape(15.dp),
@@ -281,31 +191,10 @@ fun HomeScreen(viewModel: HomeViewModel, innerPadding: PaddingValues) {
                         .background(color = Color.White)
                         .padding(5.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(5.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            modifier = Modifier
-                                .size(25.dp),
-                            shape = CircleShape,
-                            color = Color(0xFF00FFFFL).copy(alpha = 0.3f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Book,
-                                contentDescription = "Projects",
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .padding(4.dp),
-                                tint = Color.Blue
-                            )
-                        }
-
-                        Text(
-                            text = " Projects",
-                            fontSize = 12.sp,
-                            color = Color.Gray
-                        )
+                    val timeLog: HomeViewModel.TimeLogData? = if (activeProject?.timeLogs?.isNotEmpty() == true) {
+                        activeProject.timeLogs.first()
+                    } else {
+                        null
                     }
 
                     Row(
@@ -315,323 +204,213 @@ fun HomeScreen(viewModel: HomeViewModel, innerPadding: PaddingValues) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = "${allProjects.size}",
-                            fontSize = 30.sp,
-                            fontWeight = Bold,
-                            color = Color.Black
-                        )
-                    }
-                }
-            }
-
-            // Tax Bracket
-            Card(
-                elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
-                shape = RoundedCornerShape(15.dp),
-                modifier = Modifier.padding(vertical = 8.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .size(width = 185.dp, height = 115.dp)
-                        .background(color = Color.White)
-                        .padding(5.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(5.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            modifier = Modifier
-                                .size(25.dp),
-                            shape = CircleShape,
-                            color = Color(0xFF00FFFFL).copy(alpha = 0.3f)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.DomainVerification,
-                                contentDescription = "Tax Bracket",
+                            Surface(
                                 modifier = Modifier
-                                    .size(10.dp)
-                                    .padding(4.dp),
-                                tint = Color.Blue
-                            )
-                        }
-
-                        Text(
-                            text = " Tax Bracket",
-                            fontSize = 12.sp,
-                            color = Color.Gray
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(5.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = uiState.activeEarningsThisMonth.toString(),
-                            fontSize = 30.sp,
-                            fontWeight = Bold,
-                            color = Color.Black
-                        )
-
-                        Surface(
-                            modifier = Modifier
-                                .size(52.dp, 20.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFF98FF98L).copy(alpha = 0.2f)
-                        ) {
-                            Text(
-                                text = "^ +0.0%",
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .padding(2.dp),
-                                color = Color(0xFF228B22L),
-                                textAlign = TextAlign.Center,
-                                fontWeight = Bold,
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // Timer
-        Card(
-            elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
-            shape = RoundedCornerShape(15.dp),
-            modifier = Modifier
-                .padding(vertical = 8.dp, horizontal = 18.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .size(width = screenWidth - 15.dp, height = 115.dp)
-                    .background(color = Color.White)
-                    .padding(bottom = 15.dp, start = 8.dp, end = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceEvenly
-            ) {
-                val timeLog: HomeViewModel.TimeLogData? = if (activeProject?.timeLogs?.isNotEmpty() == true) {
-                    activeProject.timeLogs.first()
-                } else {
-                    null
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            modifier = Modifier
-                                .size(25.dp),
-                            shape = CircleShape,
-                            color = Color(0xFF00FFFFL).copy(alpha = 0.3f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Timer,
-                                contentDescription = "Time Worked",
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .padding(4.dp),
-                                tint = Color.Blue
-                            )
-                        }
-
-                        Text(
-                            text = " Time Worked",
-                            fontSize = 12.sp,
-                            color = Color.Gray
-                        )
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // if (settings.isPaused || !settings.isTiming) {
-                        //     Row(
-                        //         verticalAlignment = Alignment.CenterVertically
-                        //     ) {
-                        //         IconButton(
-                        //             modifier = Modifier.size(55.dp, 55.dp),
-                        //             onClick = {
-                        //                 val currentTime = LocalTime.now()
-                        //                 val currentTimeLong = currentTime.toNanoOfDay()
-//
-                        //                 if (settings.isPaused) {
-                        //                     val activeTimeLog = activeProject?.timeLogs?.last()
-                        //                     val pausedTime = currentTimeLong - (activeTimeLog?.pauseStartTime?: 0L)
-//
-                        //                     viewModel.updatePauseStartTime(activeTimeLog?.id?: 0, 0L)
-                        //                     viewModel.updateTotalPauseTime(activeTimeLog?.id?: 0, pausedTime + (activeTimeLog?.totalPauseTime?: 0L))
-//
-                        //                     viewModel.updateTimerPausedState(false)
-                        //                 } else {
-                        //                     viewModel.startTrackingTime(
-                        //                         activeProject?.id?: 0,
-                        //                         currentTime.toNanoOfDay()
-                        //                     )
-//
-                        //                     viewModel.updateTimerState(true)
-                        //                 }
-//
-                        //             },
-                        //             colors = IconButtonColors(
-                        //                 containerColor = Color.White,
-                        //                 contentColor = Color.Black,
-                        //                 disabledContentColor = Color.Black,
-                        //                 disabledContainerColor = Color.White
-                        //             ),
-                        //             shape = CircleShape
-                        //         ) {
-                        //             Icon(
-                        //                 imageVector = Icons.Default.PlayArrow,
-                        //                 contentDescription = "Start Timer",
-                        //                 modifier = Modifier
-                        //                     .size(30.dp)
-                        //                     .padding(4.dp),
-                        //                 tint = Color.Black
-                        //             )
-                        //         }
-                        //     }
-                        // } else {
-                        //     IconButton(
-                        //         modifier = Modifier.size(55.dp, 55.dp),
-                        //         onClick = {
-                        //             val activeTimeLog = activeProject?.timeLogs?.last()
-                        //             val currentTime = LocalTime.now().toNanoOfDay()
-//
-                        //             viewModel.updateTimerPausedState(true)
-                        //             viewModel.updatePauseStartTime(activeTimeLog?.id?: 0, currentTime)
-                        //         },
-                        //         colors = IconButtonColors(
-                        //             containerColor = Color.White,
-                        //             contentColor = Color.Black,
-                        //             disabledContentColor = Color.Black,
-                        //             disabledContainerColor = Color.White
-                        //         ),
-                        //         shape = CircleShape
-                        //     ) {
-                        //         Icon(
-                        //             imageVector = Icons.Default.Pause,
-                        //             contentDescription = "Pause Timer",
-                        //             modifier = Modifier
-                        //                 .size(30.dp)
-                        //                 .padding(4.dp),
-                        //             tint = Color.Black
-                        //         )
-                        //     }
-                        // }
-//
-                        // IconButton(
-                        //     modifier = Modifier.size(55.dp, 55.dp),
-                        //     onClick = {
-                        //         val activeTimeLog = activeProject?.timeLogs?.last()
-                        //         val currentTime = LocalTime.now().toNanoOfDay()
-//
-                        //         viewModel.updateTimerState(false)
-                        //         viewModel.updateEndTime(activeTimeLog?.id?: 0, currentTime)
-                        //     },
-                        //     colors = IconButtonColors(
-                        //         containerColor = Color.White,
-                        //         contentColor = Color.Black,
-                        //         disabledContentColor = Color.Black,
-                        //         disabledContainerColor = Color.White
-                        //     ),
-                        //     shape = CircleShape
-                        // ) {
-                        //     Icon(
-                        //         imageVector = Icons.Default.Stop,
-                        //         contentDescription = "Stop Timer",
-                        //         modifier = Modifier
-                        //             .size(30.dp)
-                        //             .padding(4.dp),
-                        //         tint = Color.Black
-                        //     )
-                        // }
-
-                        if (timerState) {
-                            IconButton(
-                                modifier = Modifier.size(55.dp, 55.dp),
-                                onClick = {
-                                    val activeTimeLog = activeProject?.timeLogs?.first()
-                                    val currentTime = LocalTime.now().toNanoOfDay()
-
-                                    viewModel.updateTimerState(false)
-                                    viewModel.updateEndTime(activeTimeLog?.id?: 0, currentTime)
-                                },
-                                colors = IconButtonColors(
-                                    containerColor = Color.White,
-                                    contentColor = Color.Black,
-                                    disabledContentColor = Color.Black,
-                                    disabledContainerColor = Color.White
-                                ),
-                                shape = CircleShape
+                                    .size(25.dp),
+                                shape = CircleShape,
+                                color = Color(0xFF00FFFFL).copy(alpha = 0.3f)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Stop,
-                                    contentDescription = "Stop Timer",
+                                    imageVector = Icons.Default.Timer,
+                                    contentDescription = "Time Worked",
                                     modifier = Modifier
-                                        .size(30.dp)
+                                        .size(10.dp)
                                         .padding(4.dp),
-                                    tint = Color.Black
+                                    tint = Color.Blue
                                 )
                             }
-                        } else {
-                            IconButton(
-                                modifier = Modifier.size(55.dp, 55.dp),
-                                onClick = {
-                                    if (activeProject != null) {
+
+                            Text(
+                                text = " Time Worked",
+                                fontSize = 12.sp,
+                                color = Color.Gray
+                            )
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // if (settings.isPaused || !settings.isTiming) {
+                            //     Row(
+                            //         verticalAlignment = Alignment.CenterVertically
+                            //     ) {
+                            //         IconButton(
+                            //             modifier = Modifier.size(55.dp, 55.dp),
+                            //             onClick = {
+                            //                 val currentTime = LocalTime.now()
+                            //                 val currentTimeLong = currentTime.toNanoOfDay()
+//
+                            //                 if (settings.isPaused) {
+                            //                     val activeTimeLog = activeProject?.timeLogs?.last()
+                            //                     val pausedTime = currentTimeLong - (activeTimeLog?.pauseStartTime?: 0L)
+//
+                            //                     viewModel.updatePauseStartTime(activeTimeLog?.id?: 0, 0L)
+                            //                     viewModel.updateTotalPauseTime(activeTimeLog?.id?: 0, pausedTime + (activeTimeLog?.totalPauseTime?: 0L))
+//
+                            //                     viewModel.updateTimerPausedState(false)
+                            //                 } else {
+                            //                     viewModel.startTrackingTime(
+                            //                         activeProject?.id?: 0,
+                            //                         currentTime.toNanoOfDay()
+                            //                     )
+//
+                            //                     viewModel.updateTimerState(true)
+                            //                 }
+//
+                            //             },
+                            //             colors = IconButtonColors(
+                            //                 containerColor = Color.White,
+                            //                 contentColor = Color.Black,
+                            //                 disabledContentColor = Color.Black,
+                            //                 disabledContainerColor = Color.White
+                            //             ),
+                            //             shape = CircleShape
+                            //         ) {
+                            //             Icon(
+                            //                 imageVector = Icons.Default.PlayArrow,
+                            //                 contentDescription = "Start Timer",
+                            //                 modifier = Modifier
+                            //                     .size(30.dp)
+                            //                     .padding(4.dp),
+                            //                 tint = Color.Black
+                            //             )
+                            //         }
+                            //     }
+                            // } else {
+                            //     IconButton(
+                            //         modifier = Modifier.size(55.dp, 55.dp),
+                            //         onClick = {
+                            //             val activeTimeLog = activeProject?.timeLogs?.last()
+                            //             val currentTime = LocalTime.now().toNanoOfDay()
+//
+                            //             viewModel.updateTimerPausedState(true)
+                            //             viewModel.updatePauseStartTime(activeTimeLog?.id?: 0, currentTime)
+                            //         },
+                            //         colors = IconButtonColors(
+                            //             containerColor = Color.White,
+                            //             contentColor = Color.Black,
+                            //             disabledContentColor = Color.Black,
+                            //             disabledContainerColor = Color.White
+                            //         ),
+                            //         shape = CircleShape
+                            //     ) {
+                            //         Icon(
+                            //             imageVector = Icons.Default.Pause,
+                            //             contentDescription = "Pause Timer",
+                            //             modifier = Modifier
+                            //                 .size(30.dp)
+                            //                 .padding(4.dp),
+                            //             tint = Color.Black
+                            //         )
+                            //     }
+                            // }
+//
+                            // IconButton(
+                            //     modifier = Modifier.size(55.dp, 55.dp),
+                            //     onClick = {
+                            //         val activeTimeLog = activeProject?.timeLogs?.last()
+                            //         val currentTime = LocalTime.now().toNanoOfDay()
+//
+                            //         viewModel.updateTimerState(false)
+                            //         viewModel.updateEndTime(activeTimeLog?.id?: 0, currentTime)
+                            //     },
+                            //     colors = IconButtonColors(
+                            //         containerColor = Color.White,
+                            //         contentColor = Color.Black,
+                            //         disabledContentColor = Color.Black,
+                            //         disabledContainerColor = Color.White
+                            //     ),
+                            //     shape = CircleShape
+                            // ) {
+                            //     Icon(
+                            //         imageVector = Icons.Default.Stop,
+                            //         contentDescription = "Stop Timer",
+                            //         modifier = Modifier
+                            //             .size(30.dp)
+                            //             .padding(4.dp),
+                            //         tint = Color.Black
+                            //     )
+                            // }
+
+                            if (timerState) {
+                                IconButton(
+                                    modifier = Modifier.size(28.dp, 28.dp),
+                                    onClick = {
+                                        val activeTimeLog = activeProject?.timeLogs?.first()
                                         val currentTime = LocalTime.now().toNanoOfDay()
 
-                                        viewModel.startTrackingTime(
-                                            activeProject.id,
-                                            currentTime
-                                        )
+                                        viewModel.updateTimerState(false)
+                                        viewModel.updateEndTime(activeTimeLog?.id?: 0, currentTime)
+                                    },
+                                    colors = IconButtonColors(
+                                        containerColor = Color.White,
+                                        contentColor = Color.Black,
+                                        disabledContentColor = Color.Black,
+                                        disabledContainerColor = Color.White
+                                    ),
+                                    shape = CircleShape
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Stop,
+                                        contentDescription = "Stop Timer",
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .padding(4.dp),
+                                        tint = Color.Black
+                                    )
+                                }
+                            } else {
+                                IconButton(
+                                    modifier = Modifier.size(28.dp, 28.dp),
+                                    onClick = {
+                                        if (activeProject != null) {
+                                            val currentTime = LocalTime.now().toNanoOfDay()
 
-                                        viewModel.updateTimerState(true)
-                                    } else {
-                                        showNullActiveProjectDialog = true
-                                    }
-                                },
-                                colors = IconButtonColors(
-                                    containerColor = Color.White,
-                                    contentColor = Color.Black,
-                                    disabledContentColor = Color.Black,
-                                    disabledContainerColor = Color.White
-                                ),
-                                shape = CircleShape
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = "Start Timer",
-                                    modifier = Modifier
-                                        .size(30.dp)
-                                        .padding(4.dp),
-                                    tint = Color.Black
-                                )
+                                            viewModel.startTrackingTime(
+                                                activeProject.id,
+                                                currentTime
+                                            )
+
+                                            viewModel.updateTimerState(true)
+                                        } else {
+                                            showNullActiveProjectDialog = true
+                                        }
+                                    },
+                                    colors = IconButtonColors(
+                                        containerColor = Color.White,
+                                        contentColor = Color.Black,
+                                        disabledContentColor = Color.Black,
+                                        disabledContainerColor = Color.White
+                                    ),
+                                    shape = CircleShape
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = "Start Timer",
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .padding(4.dp),
+                                        tint = Color.Black
+                                    )
+                                }
                             }
                         }
                     }
+
+                    TimerText(timeLog, settings)
+
+                    Text(
+                        text = activeProject?.title?: " No Active Project ",
+                        color = Color.Gray,
+                        fontSize = 15.sp,
+                        modifier = Modifier
+                            .fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
                 }
-
-                TimerText(timeLog, settings)
-
-                Text(
-                    text = "${activeProject?.title?: " No Active Project "}, ${activeProjectClient?.name?: "Unknown Name"}",
-                    color = Color.Gray,
-                    fontSize = 15.sp,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
             }
         }
     }

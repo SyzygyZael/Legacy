@@ -1,8 +1,6 @@
 package com.kevinnesbitt.legacysecurefreelancercrm.screens
 
-import android.widget.Button
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -26,8 +24,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowLeft
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ArrowLeft
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.Warning
@@ -59,7 +55,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
@@ -80,6 +75,7 @@ import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
 import com.kevinnesbitt.legacysecurefreelancercrm.util.DialogBox
 import com.kevinnesbitt.legacysecurefreelancercrm.util.DialogBoxSkeleton
 import com.kevinnesbitt.legacysecurefreelancercrm.util.convertMillisToDate
+import com.kevinnesbitt.legacysecurefreelancercrm.util.getCurrencySymbol
 import com.kevinnesbitt.legacysecurefreelancercrm.util.sharePdf
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.InvoiceStatus
 import kotlinx.coroutines.launch
@@ -100,6 +96,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
     val items by viewModel.items.collectAsStateWithLifecycle()
     val tasks  = project?.tasks?: emptyList()
     val timeLogs = project?.timeLogs?: emptyList()
+    val clientCurrency = client?.currency?: "Unknown"
 
     val windowInfo = LocalWindowInfo.current
     val screenWidth = windowInfo.containerDpSize.width
@@ -130,19 +127,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
         convertMillisToDate(it, settings)
     } ?: ""
 
-    val currencySymbol = when(client?.currency?: "Unknown") {
-        "USD" -> "$"
-        "EUR" -> "€"
-        "GBP" -> "£"
-        "CAD" -> "$"
-        "AUD" -> "$"
-        "INR" -> "₹"
-        "PHP" -> "₱"
-        "BRL" -> "R$"
-        "JPY" -> "¥"
-        "CHF" -> "CHF"
-        else -> "N/A"
-    }
+    val currencySymbol = getCurrencySymbol(clientCurrency)
 
     var tempInvoiceId by remember { mutableIntStateOf(0) }
     var tempClientName by remember(client) { mutableStateOf(client?.name?: "") }
@@ -158,6 +143,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
     var tempIssueDate by remember { mutableStateOf("--/--/----") }
     var tempDueDate by remember { mutableStateOf("--/--/----") }
     var tempTaxPercentage by remember { mutableDoubleStateOf(0.0) }
+    var tempStatus by remember { mutableStateOf("") }
 
     var tempItemId by remember { mutableIntStateOf(0) }
     var tempItemName by remember { mutableStateOf("") }
@@ -171,7 +157,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
     var expandItemOptions by remember { mutableStateOf<Int?>(null) }
     var expandInvoiceStatusOptions by remember { mutableStateOf<Int?>(null) }
 
-    var checkedLogs = remember { mutableStateListOf<Int>() }
+    val checkedLogs = remember { mutableStateListOf<Int>() }
 
     var isAddingInvoice by remember { mutableStateOf(false) }
     var isEditingInvoice by remember { mutableStateOf(false) }
@@ -314,8 +300,9 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                 color = Color.Black
                             )
 
+                            android.util.Log.d("fuck shit 2", "invoice: $invoice")
                             Text(
-                                text = "${invoice.amount}",
+                                text = "${currencySymbol}${invoice.amount}",
                                 color = Color.Gray,
                                 fontSize = 17.sp
                             )
@@ -354,7 +341,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                 text = invoice.status,
                                 color = when(invoice.status) {
                                     InvoiceStatus.DRAFT.name -> Color.Gray
-                                    InvoiceStatus.SENT.name -> Color.Yellow
+                                    InvoiceStatus.SENT.name -> Color(0xFFFF7518L)
                                     InvoiceStatus.PAID.name -> Color.Green
                                     else -> Color.Red
                                 },
@@ -386,6 +373,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                 val uri = HomeViewModel.InvoicePdfGenerator.generate(
                                     context = context,
                                     invoice = invoice.copy(items = itemsForThisInvoice),
+                                    currencySymbol = currencySymbol,
                                     signatureText = invoice.payTo // or null if you don't want a signature
                                 )
 
@@ -410,6 +398,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                 tempSelfEmail = invoice.selfEmail
                                 tempSelfTelephone = invoice.selfTelephone
                                 tempTaxPercentage = invoice.taxPercentage
+                                tempStatus = invoice.status
 
                                 android.util.Log.d("Id on tap Edit", "tempInvoiceId: $tempInvoiceId")
 
@@ -849,7 +838,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                     .clickable(
                                         onClick = { expandItemOptions = item.id }
                                     ),
-                                horizontalArrangement = Arrangement.SpaceAround,
+                                horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
@@ -860,7 +849,6 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                 )
 
                                 Row(
-                                    horizontalArrangement = Arrangement.SpaceAround,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
@@ -986,14 +974,19 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                     }
                                 }
 
-                                var subtotal = 0.0
-                                invoiceItems.forEach { item ->
-                                    val lineTotal = item.price * item.quantity
-                                    subtotal += lineTotal
+                                val amount = items.filter { it.invoiceId == tempInvoiceId }.sumOf { item ->
+                                    val multiplier = when (item.quantity) {
+                                        0 -> 1
+                                        -1 -> 1
+                                        else -> item.quantity
+                                    }
+                                    val subtotal = item.price * multiplier
+                                    val taxAmount = subtotal * (tempTaxPercentage / 100.0)
+
+                                    subtotal + taxAmount
                                 }
-                                
-                                val taxAmount = subtotal * (tempTaxPercentage / 100.0)
-                                val grandTotal = subtotal + taxAmount
+
+
 
                                 viewModel.updateInvoice(
                                     invoiceId = tempInvoiceId,
@@ -1009,11 +1002,14 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                     selfEmail = tempSelfEmail,
                                     selfTelephone = tempSelfTelephone,
                                     taxPercentage = tempTaxPercentage,
-                                    amount = grandTotal,
-                                    status = InvoiceStatus.DRAFT.name
+                                    amount = amount,
+                                    status = when(tempStatus) {
+                                        "" -> InvoiceStatus.DRAFT.name
+                                        else -> tempStatus
+                                    }
                                 )
 
-                                android.util.Log.d("Invoice on update", "invoice: ${viewModel.getInvoice(tempInvoiceId)}")
+                                android.util.Log.d("Amount on update", "amount: $amount")
 
                                 tempIssueDate = "--/--/----"
                                 tempDueDate = "--/--/----"
@@ -1119,7 +1115,12 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                         imeAction = ImeAction.Next,
                         keyboardType = KeyboardType.Number
                     ),
-                    modifier = Modifier.padding(all = 10.dp)
+                    modifier = Modifier.padding(all = 10.dp),
+                    leadingIcon = {
+                        Text(
+                            text = currencySymbol
+                        )
+                    }
                 )
 
                 Row(
@@ -1552,7 +1553,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                         coroutineScope.launch {
                             viewModel.createItem(
                                 invoiceId = tempInvoiceId,
-                                name = "Labor",
+                                name = "Time & Labor",
                                 quantity = 0,
                                 price = totalPrice
                             )

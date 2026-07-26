@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import com.kevinnesbitt.legacysecurefreelancercrm.database.SettingsEntity
+import com.kevinnesbitt.legacysecurefreelancercrm.variables.SupportedCurrency
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -31,4 +32,24 @@ fun sharePdf(context: Context, uri: Uri) {
     val chooser = Intent.createChooser(intent, "Open Invoice PDF")
     chooser.flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
     context.startActivity(chooser)
+}
+
+fun getCurrencySymbol(clientCurrencyCode: String): String {
+    SupportedCurrency.entries.forEach { currency ->
+        if (clientCurrencyCode == currency.code) {
+            return currency.symbol
+        }
+    }
+
+    return ""
+}
+
+fun getCurrencyName(clientCurrencyCode: String): String {
+    SupportedCurrency.entries.forEach { currency ->
+        if (clientCurrencyCode == currency.code) {
+            return currency.displayName
+        }
+    }
+
+    return ""
 }

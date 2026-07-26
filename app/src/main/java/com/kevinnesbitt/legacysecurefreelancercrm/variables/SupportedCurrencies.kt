@@ -1,14 +1,14 @@
 package com.kevinnesbitt.legacysecurefreelancercrm.variables
 
-enum class SupportedCurrency(val code: String, val symbol: String, val displayName: String) {
-    USD("USD", "$", "US Dollar ($)"),
-    EUR("EUR", "€", "Euro (€)"),
-    GBP("GBP", "£", "British Pound (£)"),
-    CAD("CAD", "$", "Canadian Dollar ($)"),
-    AUD("AUD", "$", "Australian Dollar ($)"),
-    INR("INR", "₹", "Indian Rupee (₹)"),
-    PHP("PHP", "₱", "Philippine Peso (₱)"),
-    BRL("BRL", "R$", "Brazilian Real (R$)"),
-    JPY("JPY", "¥", "Japanese Yen (¥)"),
-    CHF("CHF", "CHF", "Swiss Franc (CHF)")
+enum class SupportedCurrency(val code: String, val symbol: String, val displayName: String, val USDConversion: Float) {
+    USD("USD", "$", "US Dollar ($)", 1f),
+    EUR("EUR", "€", "Euro (€)", 0.88f),
+    GBP("GBP", "£", "British Pound (£)", 0.75f),
+    CAD("CAD", "$", "Canadian Dollar ($)", 1.41f),
+    AUD("AUD", "$", "Australian Dollar ($)", 1.43f),
+    INR("INR", "₹", "Indian Rupee (₹)", 96.57f),
+    PHP("PHP", "₱", "Philippine Peso (₱)", 61.69f),
+    BRL("BRL", "R$", "Brazilian Real (R$)", 5.08f),
+    JPY("JPY", "¥", "Japanese Yen (¥)", 163.26f),
+    CHF("CHF", "CHF", "Swiss Franc (CHF)", 0.82f)
 }

@@ -1,5 +1,6 @@
 package com.kevinnesbitt.legacysecurefreelancercrm.screens
 
+import android.graphics.drawable.Icon
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -9,14 +10,23 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -25,8 +35,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight.Companion.Bold
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -34,21 +47,28 @@ import androidx.navigation.NavController
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
 import com.kevinnesbitt.legacysecurefreelancercrm.util.DropdownSettingsRow
 import com.kevinnesbitt.legacysecurefreelancercrm.util.NavigationSettingsRow
+import com.kevinnesbitt.legacysecurefreelancercrm.util.TextInputSettingsRow
+import com.kevinnesbitt.legacysecurefreelancercrm.variables.SupportedCurrency
 
 @Composable
 fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, innerPadding: PaddingValues) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
+    var tempTaxPercentage by remember(settings) { mutableDoubleStateOf(settings.taxBracket) }
     var timeFormatChoiceString by remember(settings) { mutableStateOf(settings.timeFormat) }
     var dateFormatChoiceString by remember(settings) { mutableStateOf(settings.dateFormat) }
+    var currencyChoiceString by remember(settings) { mutableStateOf(settings.preferredCurrency) }
 
     var isChoosingTimeFormat by remember { mutableStateOf(false) }
     var isChoosingDateFormat by remember { mutableStateOf(false) }
+    var isChoosingCurrency by remember { mutableStateOf(false) }
 
     val changedSettings = when {
         (timeFormatChoiceString != settings.timeFormat) -> true
         (dateFormatChoiceString != settings.dateFormat) -> true
+        (currencyChoiceString != settings.preferredCurrency) -> true
+        (tempTaxPercentage != settings.taxBracket) -> true
         else -> false
     }
 
@@ -106,7 +126,9 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
                             selfName = settings.selfName,
                             selfEmail = settings.selfEmail,
                             selfAddress = settings.selfAddress,
-                            selfTelephone = settings.selfTelephone
+                            selfTelephone = settings.selfTelephone,
+                            currency = currencyChoiceString,
+                            taxBracket = tempTaxPercentage
                         )
 
                         Toast.makeText(context, "Saved Changes", Toast.LENGTH_LONG).show()
@@ -157,12 +179,14 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
             )
         }
 
+        // Date Format
         DropdownSettingsRow(
             expanded = isChoosingDateFormat,
             onDismissRequest = { isChoosingDateFormat = false },
             title = "Date Format",
             value = dateFormatChoiceString,
-            onClick = { isChoosingDateFormat = true }
+            onClick = { isChoosingDateFormat = true },
+            width = 128.dp
         ) {
             if (dateFormatChoiceString != "MM/dd/yyyy") {
                 DropdownMenuItem(
@@ -203,6 +227,59 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
                     }
                 )
             }
+        }
+
+        // Dashboard Currency
+        DropdownSettingsRow(
+            expanded = isChoosingCurrency,
+            onDismissRequest = { isChoosingCurrency = false },
+            title = "Dashboard Currency",
+            value = currencyChoiceString,
+            onClick = { isChoosingCurrency = true }
+        ) {
+            SupportedCurrency.entries.forEach { currency ->
+                DropdownMenuItem(
+                    text = { Text(currency.code) },
+                    onClick = {
+                        currencyChoiceString = currency.code
+                        isChoosingCurrency = false
+                    }
+                )
+            }
+        }
+
+        // Tax Bracket
+        TextInputSettingsRow(
+            title = "Tax Bracket"
+        ) {
+            OutlinedTextField(
+                value = if (tempTaxPercentage == 0.0) "" else tempTaxPercentage.toString(),
+                onValueChange = { text ->
+                    val isValidDecimal = text.count { it == '.' } <= 1 &&
+                            text.all { it.isDigit() || it == '.' }
+                    if (isValidDecimal) {
+                        tempTaxPercentage = text.toDoubleOrNull() ?: 0.0
+                    }
+                },
+                singleLine = true,
+                modifier = Modifier
+                    .size(135.dp, 70.dp)
+                    .padding(8.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                textStyle = TextStyle(
+                    textAlign = TextAlign.Center,
+                    fontSize = 20.sp
+                ),
+                shape = RoundedCornerShape(8.dp),
+                trailingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Percent,
+                        contentDescription = "Tax Bracket",
+                        tint = Color.Black,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            )
         }
     }
 }

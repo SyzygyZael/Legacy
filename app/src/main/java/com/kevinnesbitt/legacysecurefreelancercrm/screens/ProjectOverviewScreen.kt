@@ -73,6 +73,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
 import com.kevinnesbitt.legacysecurefreelancercrm.util.convertMillisToDate
+import com.kevinnesbitt.legacysecurefreelancercrm.util.getCurrencySymbol
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.BillingType
 
 @Composable
@@ -81,6 +82,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
     val clientState = viewModel.clientState.collectAsStateWithLifecycle().value.find { clientId == it.id }
     val project = clientState?.projects?.find { projectId == it.id }
     val currentTab = hubTab.replaceRange(0, 1, hubTab[0].uppercase())
+    val currencySymbol = getCurrencySymbol(clientState?.currency?: "Unknown")
 
     val description = project?.description?: ""
     val completedTasks = project?.tasks?.filter { it.isCompleted }?.size
@@ -95,49 +97,18 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
         convertMillisToDate(it, settings)
     } ?: ""
 
-    var tempProjectTitle by remember {
-        mutableStateOf("")
-    }
+    var tempProjectTitle by remember { mutableStateOf("") }
+    var tempProjectDescription by remember { mutableStateOf("") }
+    var localDescription by remember(description) { mutableStateOf(TextFieldValue(text = description)) }
+    var tempProjectRate by remember { mutableDoubleStateOf(0.0) }
+    var tempProjectBudget by remember { mutableDoubleStateOf(0.0) }
+    var tempProjectBillingType by remember { mutableStateOf("") }
+    var tempProjectDeadline by remember { mutableStateOf("--/--/----") }
+    var tempProjectStatus by remember { mutableStateOf("") }
 
-    var tempProjectDescription by remember {
-        mutableStateOf("")
-    }
-
-    var localDescription by remember(description) {
-        mutableStateOf(TextFieldValue(text = description))
-    }
-
-    var tempProjectRate by remember {
-        mutableDoubleStateOf(0.0)
-    }
-
-    var tempProjectBudget by remember {
-        mutableDoubleStateOf(0.0)
-    }
-
-    var tempProjectBillingType by remember {
-        mutableStateOf("")
-    }
-
-    var tempProjectDeadline by remember {
-        mutableStateOf("--/--/----")
-    }
-
-    var tempProjectStatus by remember {
-        mutableStateOf("")
-    }
-
-    var expandBillingTypeChoice by remember {
-        mutableStateOf(false)
-    }
-
-    var editProjectInfo by remember {
-        mutableStateOf(false)
-    }
-
-    var editDescription by remember {
-        mutableStateOf(false)
-    }
+    var expandBillingTypeChoice by remember { mutableStateOf(false) }
+    var editProjectInfo by remember { mutableStateOf(false) }
+    var editDescription by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -148,7 +119,10 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
     ) {
         Card(
             elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
-            shape = RectangleShape
+            shape = RectangleShape,
+            colors = CardDefaults.cardColors(
+                containerColor = Color.White
+            )
         ) {
             Row(
                 modifier = Modifier
@@ -194,6 +168,17 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                     )
                 }
             }
+
+            Text(
+                text = "Budget: ${currencySymbol}${project?.budget?: "N/A"}",
+                fontSize = 17.sp,
+                color = Color.Gray,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 10.dp)
+                    .background(color = Color.White),
+                textAlign = TextAlign.Start
+            )
 
             Row(
                 modifier = Modifier
@@ -685,7 +670,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                         }
 
                         Text(
-                            text = "${project?.payRate}${rateType}",
+                            text = "${currencySymbol}${project?.payRate}${rateType}",
                             fontSize = 20.sp,
                             fontWeight = Bold,
                             color = Color.Black
@@ -837,7 +822,10 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                             .fillMaxWidth()
                             .padding(5.dp),
                         textStyle = TextStyle(fontSize = 20.sp),
-                        singleLine = true
+                        singleLine = true,
+                        leadingIcon = {
+                            Text(currencySymbol)
+                        }
                     )
 
                     HorizontalDivider(color = Color.White)
@@ -866,7 +854,10 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                             .fillMaxWidth()
                             .padding(5.dp),
                         textStyle = TextStyle(fontSize = 20.sp),
-                        singleLine = true
+                        singleLine = true,
+                        leadingIcon = {
+                            Text(currencySymbol)
+                        }
                     )
 
                     HorizontalDivider(color = Color.White, thickness = 15.dp)

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.ArrowBackIosNew
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonColors
@@ -33,7 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight.Companion.Bold
 import androidx.compose.ui.text.input.ImeAction
@@ -49,9 +47,9 @@ fun ProfileScreen(viewModel: HomeViewModel, navController: NavController, innerP
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    val windowInfo = LocalWindowInfo.current
-    val screenWidth = windowInfo.containerDpSize.width
-    val screenHeight = windowInfo.containerDpSize.height
+    // val windowInfo = LocalWindowInfo.current
+    // val screenWidth = windowInfo.containerDpSize.width
+    // val screenHeight = windowInfo.containerDpSize.height
 
     var tempName by remember(settings) { mutableStateOf(settings.selfName) }
     var tempAddress by remember(settings) { mutableStateOf(settings.selfAddress) }
@@ -116,7 +114,9 @@ fun ProfileScreen(viewModel: HomeViewModel, navController: NavController, innerP
                             selfName = tempName,
                             selfAddress = tempAddress,
                             selfEmail = tempEmail,
-                            selfTelephone = tempTelephone
+                            selfTelephone = tempTelephone,
+                            currency = settings.preferredCurrency,
+                            taxBracket = settings.taxBracket
                         )
 
                         Toast.makeText(context, "Saved Changes", Toast.LENGTH_LONG).show()

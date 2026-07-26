@@ -1,43 +1,53 @@
 package com.kevinnesbitt.legacysecurefreelancercrm.util
 
+import android.annotation.SuppressLint
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonColors
+import androidx.compose.material.icons.automirrored.filled.ArrowLeft
+import androidx.compose.material.icons.filled.DomainVerification
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight.Companion.Bold
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -171,7 +181,7 @@ fun TimerText(timeLog: HomeViewModel.TimeLogData?, settings: SettingsEntity) {
 }
 
 @Composable
-fun DropdownSettingsRow(expanded: Boolean, onDismissRequest: () -> Unit, title: String, value: String, onClick: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+fun DropdownSettingsRow(expanded: Boolean, onDismissRequest: () -> Unit, title: String, value: String, onClick: () -> Unit, width: Dp = 120.dp, height: Dp = 60.dp, content: @Composable ColumnScope.() -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -189,7 +199,7 @@ fun DropdownSettingsRow(expanded: Boolean, onDismissRequest: () -> Unit, title: 
         Card(
             border = BorderStroke(2.dp, color = Color.Gray),
             modifier = Modifier
-                .size(120.dp, 60.dp)
+                .size(width, height)
                 .padding(10.dp)
                 .clickable(
                     onClick = onClick
@@ -237,5 +247,156 @@ fun NavigationSettingsRow(title: String, navigateTo: String, navController: NavC
                 .size(23.dp),
             tint = Color.Black
         )
+    }
+}
+
+@Composable
+fun TextDropDown(
+    text: String,
+    expanded: Boolean,
+    onClick: () -> Unit,
+    onDismissRequest: () -> Unit,
+    color: Color = Color.Black,
+    fontSize: TextUnit = 20.sp,
+    content: @Composable (ColumnScope.() -> Unit)
+) {
+    Row(
+        modifier = Modifier.clickable(
+            onClick = onClick
+        )
+    ) {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = onDismissRequest
+        ) {
+            content()
+        }
+
+        val rotationAngle by animateFloatAsState(
+            targetValue = if (expanded) -90f else 0f,
+            label = "IconRotationAnimation"
+        )
+
+        Text(
+            text = text,
+            color = color,
+            fontSize = fontSize
+        )
+
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.ArrowLeft,
+            contentDescription = "Status Dropdown",
+            tint = Color.Black,
+            modifier = Modifier.rotate(rotationAngle)
+        )
+    }
+}
+
+@SuppressLint("ComposableNaming")
+@Composable
+fun TextInputSettingsRow(
+    title: String,
+    content: @Composable (RowScope.() -> Unit)
+) {
+    var tempText by remember { mutableDoubleStateOf(0.0) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(color = Color.White),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            modifier = Modifier.padding(21.dp),
+            fontSize = 18.sp,
+            color = Color.Black
+        )
+
+        content()
+    }
+}
+
+@Composable
+fun InfoCard(
+    title: String,
+    icon: ImageVector,
+    iconTint: Color = LocalContentColor.current,
+    iconBackgroundColor: Color = Color.White,
+    value: String,
+    fontSize: TextUnit = 30.sp
+) {
+    Card(
+        elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
+        shape = RoundedCornerShape(15.dp),
+        modifier = Modifier.padding(vertical = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .size(width = 185.dp, height = 115.dp)
+                .background(color = Color.White)
+                .padding(5.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(5.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .size(25.dp),
+                    shape = CircleShape,
+                    color = iconBackgroundColor
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = title,
+                        modifier = Modifier
+                            .size(10.dp)
+                            .padding(4.dp),
+                        tint = iconTint
+                    )
+                }
+
+                Text(
+                    text = " $title",
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Start
+            ) {
+                Text(
+                    text = value,
+                    fontSize = fontSize,
+                    fontWeight = Bold,
+                    color = Color.Black
+                )
+
+                // Surface(
+                //     modifier = Modifier
+                //         .size(52.dp, 20.dp),
+                //     shape = RoundedCornerShape(8.dp),
+                //     color = Color(0xFF98FF98L).copy(alpha = 0.2f)
+                // ) {
+                //     Text(
+                //         text = "^ +0.0%",
+                //         modifier = Modifier
+                //             .size(10.dp)
+                //             .padding(2.dp),
+                //         color = Color(0xFF228B22L),
+                //         textAlign = TextAlign.Center,
+                //         fontWeight = Bold,
+                //         fontSize = 11.sp
+                //     )
+                // }
+            }
+        }
     }
 }
