@@ -169,10 +169,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
                 totalEarnings += (paidInvoice.amount / toDollarConversion) * toTargetCurrencyConversion
 
-                android.util.Log.d(
-                    "Fuck shit",
-                    "project: $thisProject\nclient: $thisClient\ndollar: $toDollarConversion\ntarget: $toTargetCurrencyConversion\ntotal: $totalEarnings\ninvoice: $paidInvoice"
-                )
+
             }
 
         // Overdue Invoices lists
