@@ -3,26 +3,32 @@ package com.kevinnesbitt.legacysecurefreelancercrm.util
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
+import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel.InvoiceData
 import com.kevinnesbitt.legacysecurefreelancercrm.database.SettingsEntity
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.SupportedCurrency
 import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
+import kotlin.collections.forEachIndexed
 
 fun convertMillisToDate(millis: Long, settings: SettingsEntity): String {
     val formatter = SimpleDateFormat(settings.dateFormat, Locale.getDefault())
     return formatter.format(Date(millis))
 }
 
-fun convertDateToMillis(dateString: String, settings: SettingsEntity): Long? {
-    if (dateString == "--/--/----" || dateString.isBlank()) return null
-    return try {
-        val format = SimpleDateFormat(settings.dateFormat, Locale.getDefault())
-        format.parse(dateString)?.time
-    } catch (e: Exception) {
-        null
-    }
-}
+// fun convertDateToMillis(dateString: String, settings: SettingsEntity): Long? {
+//     if (dateString == "--/--/----" || dateString.isBlank()) return null
+//     return try {
+//         val format = SimpleDateFormat(settings.dateFormat, Locale.getDefault())
+//         format.parse(dateString)?.time
+//     } catch (e: Exception) {
+//         null
+//     }
+// }
 fun sharePdf(context: Context, uri: Uri) {
     val intent = Intent(Intent.ACTION_VIEW).apply {
         setDataAndType(uri, "application/pdf")
@@ -52,4 +58,126 @@ fun getCurrencyName(clientCurrencyCode: String): String {
     }
 
     return ""
+}
+
+fun getLastSixMonths(): MutableList<String> {
+    val currentDate = LocalDate.now()
+    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+
+    val intToMonth = mapOf(
+        1 to "Jan",
+        2 to "Feb",
+        3 to "Mar",
+        4 to "Apr",
+        5 to "May",
+        6 to "Jun",
+        7 to "Jul",
+        8 to "Aug",
+        9 to "Sep",
+        10 to "Oct",
+        11 to "Nov",
+        12 to "Dec"
+    )
+
+    val regCurrentDateStr = formatter.format(currentDate)
+    val currentMonth = when(regCurrentDateStr.substring(5, 7)[0]) {
+        '0' -> regCurrentDateStr.substring(5, 7)[1].toString().toInt()
+        else -> regCurrentDateStr.substring(5, 7).toInt()
+    }
+
+    val months = mutableListOf(
+        currentMonth,
+        currentMonth - 1,
+        currentMonth - 2,
+        currentMonth - 3,
+        currentMonth - 4,
+        currentMonth - 5
+    )
+
+    val strMonths = mutableListOf<String>()
+
+    months.forEachIndexed { index, month ->
+        when(month) {
+            0 -> months[index] = 12
+            -1 -> months[index] = 11
+            -2 -> months[index] = 10
+            -3 -> months[index] = 9
+            -4 -> months[index] = 8
+        }
+    }
+
+    months.forEach { month ->
+        strMonths.add(intToMonth[month]?: "N/A")
+    }
+
+    android.util.Log.d("months", "Months: $strMonths")
+    return strMonths.asReversed()
+}
+
+
+fun getMonthFromShortForm(shortMonth: String): String {
+    return when(shortMonth) {
+        "Jan" -> "January"
+        "Feb" -> "February"
+        "Mar" -> "March"
+        "Apr" -> "April"
+        "May" -> "May"
+        "Jun" -> "June"
+        "Jul" -> "July"
+        "Aug" -> "August"
+        "Sep" -> "September"
+        "Oct" -> "October"
+        "Nov" -> "November"
+        else -> "December"
+    }
+}
+
+fun getLast6MonthsEarnings(
+    paidInvoices: List<InvoiceData>,
+    settings: SettingsEntity,
+    clients: List<HomeViewModel.ClientData>,
+    projects: List<HomeViewModel.ProjectData>
+): List<Float> {
+    // 1. Generate the last 6 months keys (e.g., "2026-02", "2026-03", ..., "2026-07")
+    val currentMonth = YearMonth.now()
+    val last6Months = (5 downTo 0).map { minusMonths ->
+        currentMonth.minusMonths(minusMonths.toLong())
+    }
+
+    val formatter = DateTimeFormatter.ofPattern(settings.dateFormat)
+
+    // 2. Map each of the last 6 months to a sum of its converted paid invoices
+    return last6Months.map { targetYearMonth ->
+        // Filter invoices belonging to this specific month
+        val monthlyInvoices = paidInvoices.filter { invoice ->
+            try {
+                val invoiceDate = LocalDate.parse(invoice.issueDate, formatter)
+                YearMonth.from(invoiceDate) == targetYearMonth
+            } catch (e: Exception) {
+                false
+            }
+        }
+
+        // 3. Convert and sum up the amounts for this month using your custom logic
+        var monthlyTotal = 0.0
+
+        for (invoice in monthlyInvoices) {
+            val thisProject = projects.find { project -> project.id == invoice.projectId }
+            val thisClient = clients.find { client -> client.id == thisProject?.clientId }
+
+            val toDollarConversion = SupportedCurrency.entries.find { it.code == (thisClient?.currency?: "USD") }?.USDConversion ?: 0f
+            val toTargetCurrencyConversion = SupportedCurrency.entries.find { it.code == settings.preferredCurrency }?.USDConversion ?: 0f
+
+            // Prevent division by zero if conversion rate is missing
+            val convertedAmount = if (toDollarConversion > 0f) {
+                (invoice.amount / toDollarConversion) * toTargetCurrencyConversion
+            } else {
+                invoice.amount
+            }
+
+            monthlyTotal += convertedAmount
+        }
+
+        monthlyTotal.toFloat()
+    }
 }

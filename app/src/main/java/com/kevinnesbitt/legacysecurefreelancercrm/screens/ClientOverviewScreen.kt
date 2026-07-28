@@ -708,7 +708,8 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                             tempEmailText = text
                         },
                         keyboardOptions = KeyboardOptions(
-                            imeAction = ImeAction.Next
+                            imeAction = ImeAction.Next,
+                            keyboardType = KeyboardType.Email
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -736,7 +737,7 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                         },
                         keyboardOptions = KeyboardOptions(
                             imeAction = ImeAction.Next,
-                            keyboardType = KeyboardType.Number
+                            keyboardType = KeyboardType.Phone
                         ),
                         modifier = Modifier
                             .fillMaxWidth()

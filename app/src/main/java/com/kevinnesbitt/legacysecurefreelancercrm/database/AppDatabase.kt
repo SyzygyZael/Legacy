@@ -75,6 +75,7 @@ data class InvoiceEntity(
     val amount: Double = 0.0,
     val issueDate: String,
     val dueDate: String,
+    val paidDate: String = "--/--/----",
     val issueTo: String,
     val clientCompany: String,
     val clientEmail: String,
@@ -209,6 +210,9 @@ interface AppDao {
     @Query("UPDATE settings SET preferredCurrency = :currency WHERE id = 1")
     suspend fun updatePreferredCurrency(currency: String)
 
+    @Query("UPDATE invoices SET paidDate = :paidDate WHERE id = :invoiceId")
+    suspend fun updateInvoicePaidDate(invoiceId: Int, paidDate: String)
+
     @Query("UPDATE settings SET timeFormat = :timeFormat, dateFormat = :dateFormat, selfName = :selfName, selfAddress = :selfAddress, selfEmail = :selfEmail, selfTelephone = :selfTelephone, preferredCurrency = :currency, taxBracket = :taxBracket WHERE id = 1")
     suspend fun updateSettings(
         timeFormat: String,
@@ -230,6 +234,9 @@ interface AppDao {
 
     @Query("DELETE FROM invoice_item WHERE id = :itemId")
     suspend fun deleteItem(itemId: Int)
+
+    @Query("DELETE FROM invoice_item WHERE invoiceId = :invoiceId")
+    suspend fun deleteItemsInInvoice(invoiceId: Int)
 
     @Query("DELETE FROM invoices WHERE id = :invoiceId")
     suspend fun deleteInvoice(invoiceId: Int)
@@ -293,7 +300,7 @@ interface AppDao {
         ItemEntity::class,
         SettingsEntity::class
                          ],
-        version = 33
+        version = 34
     )
     abstract class AppDatabase : RoomDatabase() {
         abstract fun appDao(): AppDao

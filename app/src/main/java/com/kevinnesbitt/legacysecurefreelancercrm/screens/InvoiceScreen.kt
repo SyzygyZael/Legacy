@@ -83,7 +83,7 @@ import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-import java.util.Locale
+import androidx.compose.ui.platform.LocalLocale
 
 @Composable
 fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
@@ -105,7 +105,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
     var localInvoices by remember(project) { mutableStateOf(project?.invoices?: emptyList()) }
 
     val currentDate = LocalDate.now()
-    val formatter = DateTimeFormatter.ofPattern(settings.dateFormat, Locale.getDefault())
+    val formatter = DateTimeFormatter.ofPattern(settings.dateFormat, LocalLocale.current.platformLocale)
     val currentDateStr = formatter.format(currentDate)
 
     localInvoices.filter { invoice ->
@@ -142,7 +142,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
 
     var tempIssueDate by remember { mutableStateOf("--/--/----") }
     var tempDueDate by remember { mutableStateOf("--/--/----") }
-    var tempTaxPercentage by remember { mutableDoubleStateOf(0.0) }
+    var tempTaxPercentage by remember(settings) { mutableDoubleStateOf(settings.taxBracket) }
     var tempStatus by remember { mutableStateOf("") }
 
     var tempItemId by remember { mutableIntStateOf(0) }
@@ -300,7 +300,6 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                 color = Color.Black
                             )
 
-                            android.util.Log.d("fuck shit 2", "invoice: $invoice")
                             Text(
                                 text = "${currencySymbol}${invoice.amount}",
                                 color = Color.Gray,
@@ -324,6 +323,10 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                         DropdownMenuItem(
                                             text = { Text(status.name) },
                                             onClick = {
+                                                if (status.name == InvoiceStatus.PAID.name) {
+                                                    viewModel.updateInvoicePaidDate(invoice.id, currentDateStr)
+                                                }
+
                                                 viewModel.updateInvoiceStatus(invoice.id, status.name)
                                                 expandInvoiceStatusOptions = null
                                             }
@@ -560,7 +563,10 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                         onValueChange = { text ->
                             tempClientEmail = text
                         },
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next,
+                            keyboardType = KeyboardType.Email
+                        ),
                         label = { Text("Client Email") },
                         singleLine = true,
                         modifier = Modifier.padding(all = padding)
@@ -577,7 +583,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                         },
                         keyboardOptions = KeyboardOptions(
                             imeAction = ImeAction.Next,
-                            keyboardType = KeyboardType.Number
+                            keyboardType = KeyboardType.Phone
                         ),
                         label = { Text("Client Telephone") },
                         singleLine = true,
@@ -626,7 +632,10 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                         onValueChange = { text ->
                             tempSelfEmail = text
                         },
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Next,
+                            keyboardType = KeyboardType.Email
+                        ),
                         label = { Text("Email") },
                         singleLine = true,
                         modifier = Modifier.padding(all = padding)
@@ -643,7 +652,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                         },
                         keyboardOptions = KeyboardOptions(
                             imeAction = ImeAction.Next,
-                            keyboardType = KeyboardType.Number
+                            keyboardType = KeyboardType.Phone
                         ),
                         label = { Text("Telephone") },
                         singleLine = true,
@@ -1612,7 +1621,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                             )
                         )
 
-                        val formatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())
+                        val formatter = DateTimeFormatter.ofPattern("hh:mm a", LocalLocale.current.platformLocale)
                         val startTimeObj = LocalTime.ofNanoOfDay(log.startTime)
                         val endTimeObj = LocalTime.ofNanoOfDay(log.endTime)
 

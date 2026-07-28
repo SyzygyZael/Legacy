@@ -3,13 +3,11 @@ package com.kevinnesbitt.legacysecurefreelancercrm.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,7 +19,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CurrencyExchange
-import androidx.compose.material.icons.filled.DomainVerification
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.StackedLineChart
 import androidx.compose.material.icons.filled.Stop
@@ -52,22 +49,23 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight.Companion.Bold
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
-import com.kevinnesbitt.legacysecurefreelancercrm.util.AnimatedBarChart
 import com.kevinnesbitt.legacysecurefreelancercrm.util.DialogBoxSkeleton
 import com.kevinnesbitt.legacysecurefreelancercrm.util.InfoCard
 import com.kevinnesbitt.legacysecurefreelancercrm.util.ListCard
-import com.kevinnesbitt.legacysecurefreelancercrm.util.SimpleBarChart
 import com.kevinnesbitt.legacysecurefreelancercrm.util.TimerText
 import com.kevinnesbitt.legacysecurefreelancercrm.util.WaveBarChart
 import com.kevinnesbitt.legacysecurefreelancercrm.util.getCurrencySymbol
+import com.kevinnesbitt.legacysecurefreelancercrm.variables.InvoiceStatus
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.ProjectStatus
 import java.time.LocalTime
-import java.util.Locale
+import androidx.compose.ui.platform.LocalLocale
+import com.kevinnesbitt.legacysecurefreelancercrm.util.getLast6MonthsEarnings
+import com.kevinnesbitt.legacysecurefreelancercrm.util.getLastSixMonths
+import com.kevinnesbitt.legacysecurefreelancercrm.util.getMonthFromShortForm
 
 @Composable
 fun HomeScreen(viewModel: HomeViewModel, innerPadding: PaddingValues) {
@@ -79,11 +77,17 @@ fun HomeScreen(viewModel: HomeViewModel, innerPadding: PaddingValues) {
             project.status == ProjectStatus.ACTIVE.name
         }
     }?.projects?.find { it.status == ProjectStatus.ACTIVE.name }
-    val activeProjectClient = clientState.find { it.id == (activeProject?.clientId?: 0) }
+    // val activeProjectClient = clientState.find { it.id == (activeProject?.clientId?: 0) }
 
     val allProjects = clientState.flatMap { client ->
         client.projects
     }
+
+    val paidInvoices = clientState.flatMap { client -> client.projects }
+        .flatMap { project -> project.invoices }
+        .filter { invoice -> invoice.status == InvoiceStatus.PAID.name }
+
+    val earnings = getLast6MonthsEarnings(paidInvoices, settings, clientState, allProjects)
 
     val lazyListState = rememberLazyListState()
 
@@ -111,6 +115,7 @@ fun HomeScreen(viewModel: HomeViewModel, innerPadding: PaddingValues) {
             .background(color = Color(0xFFF2F2F2L)),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+
         Card(
             elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
             shape = RectangleShape
@@ -137,7 +142,6 @@ fun HomeScreen(viewModel: HomeViewModel, innerPadding: PaddingValues) {
             state = lazyListState
         ) {
             item {
-
                 // GRAPH
                 Card(
                     elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
@@ -175,13 +179,29 @@ fun HomeScreen(viewModel: HomeViewModel, innerPadding: PaddingValues) {
                             )
                         }
 
+                        val thisMonthEarnings = String.format(
+                            LocalLocale.current.platformLocale,
+                            "%.2f",
+                            earnings.last() * ((100 - settings.taxBracket) / 100)
+                        )
+                        Text(
+                            text = "${currencySymbol}${thisMonthEarnings} ${getMonthFromShortForm(getLastSixMonths().last())}",
+                            fontSize = 25.sp,
+                            fontWeight = Bold,
+                            color = Color.White,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 50.dp, start = 20.dp),
+                            textAlign = TextAlign.Start
+                        )
+
                         WaveBarChart(
-                            dataPoints = listOf(2.0f, 5.0f, 10.0f, 8f, 15f),
+                            dataPoints = earnings,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(120.dp),
                             color = Color(0xFF64B5F6),
-                            labels = listOf("Jun", "Jun", "Jun", "Jun", "Jun")
+                            labels = getLastSixMonths()
                         )
                     }
                 }
@@ -193,9 +213,7 @@ fun HomeScreen(viewModel: HomeViewModel, innerPadding: PaddingValues) {
                         .fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column(
-
-                    ) {
+                    Column {
                         // Total earnings
                         InfoCard(
                             title = "Total Earnings",
@@ -204,12 +222,12 @@ fun HomeScreen(viewModel: HomeViewModel, innerPadding: PaddingValues) {
                             iconBackgroundColor = Color(0xFF00FFFFL).copy(alpha = 0.3f),
                             value = "${currencySymbol}${
                                 String.format(
-                                    Locale.getDefault(),
+                                    LocalLocale.current.platformLocale,
                                     "%.2f",
                                     uiState.totalEarnings * ((100 - settings.taxBracket) / 100)
                                 )
                             }",
-                            fontSize = 20.sp
+                            fontSize = 18.sp
                         )
 
                         // Pending Invoices
@@ -456,9 +474,7 @@ fun HomeScreen(viewModel: HomeViewModel, innerPadding: PaddingValues) {
                             }
                         }
                     }
-                    Column(
-
-                    ) {
+                    Column {
                         // Priority Tasks
                         ListCard(
                             title = "Priority Tasks",

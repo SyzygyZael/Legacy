@@ -427,7 +427,7 @@ fun ListCard(
    ) {
        Column(
            modifier = Modifier
-               .size(width = 185.dp, height = 220.dp)
+               .size(width = 185.dp, height = 245.dp)
                .background(color = Color.White)
                .padding(5.dp)
        ) {

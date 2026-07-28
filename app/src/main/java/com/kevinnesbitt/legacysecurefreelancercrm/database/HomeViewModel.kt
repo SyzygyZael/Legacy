@@ -25,14 +25,10 @@ import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import java.util.Locale
 import android.graphics.*
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.InvoiceStatus
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.SupportedCurrency
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import java.nio.DoubleBuffer
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -168,8 +164,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 val toTargetCurrencyConversion = SupportedCurrency.entries.find { it.code == settings.value.preferredCurrency }?.USDConversion?: 0f
 
                 totalEarnings += (paidInvoice.amount / toDollarConversion) * toTargetCurrencyConversion
-
-
             }
 
         // Overdue Invoices lists
@@ -395,12 +389,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteInvoice(invoiceId: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             dao.deleteInvoice(invoiceId)
+            dao.deleteItemsInInvoice(invoiceId)
         }
     }
 
-    fun getInvoice(invoiceId: Int) {
+    // fun getInvoice(invoiceId: Int) {
+    //     viewModelScope.launch(Dispatchers.IO) {
+    //         dao.getInvoice(invoiceId)
+    //     }
+    // }
+
+    fun updateInvoicePaidDate(invoiceId: Int, paidDate: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            dao.getInvoice(invoiceId)
+            dao.updateInvoicePaidDate(invoiceId, paidDate)
         }
     }
 
@@ -485,11 +486,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     //     }
     // }
 
-    fun quickMarkInvoicePaid(invoice: InvoiceEntity) {
-        viewModelScope.launch(Dispatchers.IO) {
-            dao.insertInvoice(invoice.copy(status = "Paid"))
-        }
-    }
+    // fun quickMarkInvoicePaid(invoice: InvoiceEntity) {
+    //     viewModelScope.launch(Dispatchers.IO) {
+    //         dao.insertInvoice(invoice.copy(status = "Paid"))
+    //     }
+    // }
 
     fun updateClientStatus(status: String, clientId: Int) {
         viewModelScope.launch {
@@ -592,11 +593,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     //     }
     // }
 
-    fun updateStartTime(timeLogId: Int, startTime: Long) {
-        viewModelScope.launch {
-            dao.updateStartTime(timeLogId, startTime)
-        }
-    }
+    // fun updateStartTime(timeLogId: Int, startTime: Long) {
+    //     viewModelScope.launch {
+    //         dao.updateStartTime(timeLogId, startTime)
+    //     }
+    // }
 
     fun updateEndTime(timeLogId: Int, endTime: Long) {
         viewModelScope.launch {
@@ -622,11 +623,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     //     }
     // }
 
-    fun updateTimeLogDate(timeLogId: Int, date: String) {
-        viewModelScope.launch {
-            dao.updateTimeLogDate(timeLogId, date)
-        }
-    }
+    // fun updateTimeLogDate(timeLogId: Int, date: String) {
+    //     viewModelScope.launch {
+    //         dao.updateTimeLogDate(timeLogId, date)
+    //     }
+    // }
 
 // ─── PDF Generator ───────────────────────────────────────────
 

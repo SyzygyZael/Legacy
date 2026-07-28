@@ -211,7 +211,7 @@ fun ProfileScreen(viewModel: HomeViewModel, navController: NavController, innerP
             },
             keyboardOptions = KeyboardOptions(
                 imeAction = ImeAction.Next,
-                keyboardType = KeyboardType.Number
+                keyboardType = KeyboardType.Phone
             ),
             singleLine = true,
             modifier = Modifier

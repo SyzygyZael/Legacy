@@ -10,5 +10,7 @@ enum class SupportedCurrency(val code: String, val symbol: String, val displayNa
     PHP("PHP", "₱", "Philippine Peso (₱)", 61.69f),
     BRL("BRL", "R$", "Brazilian Real (R$)", 5.08f),
     JPY("JPY", "¥", "Japanese Yen (¥)", 163.26f),
-    CHF("CHF", "CHF", "Swiss Franc (CHF)", 0.82f)
+    CHF("CHF", "CHF ", "Swiss Franc (CHF)", 0.82f),
+    IDR("IDR", "Rp ", "Indonesian Rupiah (Rp)", 18070.00f),
+    QAR("QAR", "QAR ", "Qatari Riyal", 3.64f)
 }
