@@ -1,7 +1,11 @@
 package com.kevinnesbitt.legacysecurefreelancercrm.screens
 
-import android.graphics.drawable.Icon
+import android.graphics.Bitmap
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,12 +16,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -29,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,16 +49,49 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
 import com.kevinnesbitt.legacysecurefreelancercrm.util.DropdownSettingsRow
+import com.kevinnesbitt.legacysecurefreelancercrm.util.DueDateCheckWorker
 import com.kevinnesbitt.legacysecurefreelancercrm.util.NavigationSettingsRow
-import com.kevinnesbitt.legacysecurefreelancercrm.util.TextInputSettingsRow
+import com.kevinnesbitt.legacysecurefreelancercrm.util.SettingsRow
+import com.kevinnesbitt.legacysecurefreelancercrm.util.uriToBitmap
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.SupportedCurrency
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, innerPadding: PaddingValues) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    var logoUri by remember { mutableStateOf<Uri?>(null) }
+    var logoBitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        logoUri = uri
+
+        if (uri != null) {
+            // 1. Convert it to a Bitmap
+            val bitmap = uriToBitmap(context, uri)
+            logoBitmap = bitmap
+
+            // 2. Save it to storage and show the Toast
+            bitmap?.let {
+                coroutineScope.launch {
+                    viewModel.saveImageToInternalStorage(context, it)
+
+                    // Show the toast after it successfully saves
+                    Toast.makeText(context, "Image upload successful", Toast.LENGTH_SHORT).show()
+                }
+            }
+        } else {
+            logoBitmap = null
+        }
+    }
 
     var tempTaxPercentage by remember(settings) { mutableDoubleStateOf(settings.taxBracket) }
     var timeFormatChoiceString by remember(settings) { mutableStateOf(settings.timeFormat) }
@@ -249,7 +287,7 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
         }
 
         // Tax Bracket
-        TextInputSettingsRow(
+        SettingsRow(
             title = "Tax Bracket"
         ) {
             OutlinedTextField(
@@ -280,6 +318,53 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
                     )
                 }
             )
+        }
+
+        // Invoice Logo Upload
+        SettingsRow(
+            title = "Upload Invoice Logo"
+        ) {
+            Button(
+                onClick = {
+                    photoPickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                },
+                colors = ButtonDefaults.buttonColors(
+                    contentColor = Color.Black,
+                    containerColor = Color.White
+                )
+            ) {
+                Text(
+                    text = "Upload",
+                    fontWeight = Bold,
+                    fontSize = 18.sp,
+                    color = Color.Black
+                )
+            }
+        }
+
+        // Test Notifications
+        SettingsRow(
+            title = "Test Notifications"
+        ) {
+            Button(
+                onClick = {
+                    val testRequest = OneTimeWorkRequestBuilder<DueDateCheckWorker>().build()
+                    WorkManager.getInstance(context).enqueue(testRequest)
+                },
+                colors = ButtonDefaults.buttonColors(
+                    contentColor = Color.Black,
+                    containerColor = Color.White
+                )
+            ) {
+                Text(
+                    text = "Test",
+                    fontWeight = Bold,
+                    fontSize = 18.sp,
+                    color = Color.Black
+                )
+            }
         }
     }
 }

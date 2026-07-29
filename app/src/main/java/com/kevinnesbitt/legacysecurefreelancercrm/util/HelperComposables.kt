@@ -305,7 +305,7 @@ fun TextDropDown(
 
 @SuppressLint("ComposableNaming")
 @Composable
-fun TextInputSettingsRow(
+fun SettingsRow(
     title: String,
     content: @Composable (RowScope.() -> Unit)
 ) {

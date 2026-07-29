@@ -2,11 +2,15 @@ package com.kevinnesbitt.legacysecurefreelancercrm.util
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel.InvoiceData
 import com.kevinnesbitt.legacysecurefreelancercrm.database.SettingsEntity
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.SupportedCurrency
+import java.io.File
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.YearMonth
@@ -14,6 +18,16 @@ import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
 import kotlin.collections.forEachIndexed
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import java.util.concurrent.TimeUnit
+import com.kevinnesbitt.legacysecurefreelancercrm.R
 
 fun convertMillisToDate(millis: Long, settings: SettingsEntity): String {
     val formatter = SimpleDateFormat(settings.dateFormat, Locale.getDefault())
@@ -151,7 +165,7 @@ fun getLast6MonthsEarnings(
         // Filter invoices belonging to this specific month
         val monthlyInvoices = paidInvoices.filter { invoice ->
             try {
-                val invoiceDate = LocalDate.parse(invoice.issueDate, formatter)
+                val invoiceDate = LocalDate.parse(invoice.paidDate, formatter)
                 YearMonth.from(invoiceDate) == targetYearMonth
             } catch (e: Exception) {
                 false
@@ -180,4 +194,89 @@ fun getLast6MonthsEarnings(
 
         monthlyTotal.toFloat()
     }
+}
+
+fun uriToBitmap(context: Context, uri: Uri): Bitmap? {
+    return try {
+        // Open an input stream from the URI and decode it into a Bitmap
+        context.contentResolver.openInputStream(uri)?.use { inputStream ->
+            BitmapFactory.decodeStream(inputStream)
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
+    }
+}
+
+fun loadBitmapFromPath(imagePath: String?): Bitmap? {
+    if (imagePath.isNullOrEmpty()) return null
+
+    val file = File(imagePath)
+    if (!file.exists()) return null
+
+    // Decodes the file path directly into a Bitmap
+    return BitmapFactory.decodeFile(file.absolutePath)
+}
+
+object NotificationHelper {
+
+    private const val CHANNEL_ID = "invoice_notifications"
+
+    fun showNotification(context: Context, title: String, message: String) {
+        // 1. Create the Notification Channel (Required for Android 8.0+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "Invoices"
+            val descriptionText = "Notifications for invoice updates and generation"
+            val importance = NotificationManager.IMPORTANCE_DEFAULT
+            val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
+                description = descriptionText
+            }
+
+            // Register the channel with the system
+            val notificationManager: NotificationManager =
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        // 2. Build the Notification
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.legacy_notification) // Replace with your app's notification icon
+            .setContentTitle(title)
+            .setContentText(message)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true) // Dismisses the notification when the user clicks it
+
+        // 3. Show the Notification
+        try {
+            with(NotificationManagerCompat.from(context)) {
+                // notificationId is a unique int for each notification that you must define
+                val notificationId = System.currentTimeMillis().toInt()
+                notify(notificationId, builder.build())
+            }
+        } catch (e: SecurityException) {
+            // Handle the case where the user denied the POST_NOTIFICATIONS permission
+            android.util.Log.e("Notification", "Permission denied", e)
+        }
+    }
+}
+
+fun scheduleDueDateChecker(context: Context) {
+    // Optional: Add constraints (e.g., only run if the device has battery/isn't in low power mode)
+    val constraints = Constraints.Builder()
+        // .setRequiresBatteryNotLow(true)
+        .build()
+
+    // Create a request to run this worker roughly once every 24 hours
+    val workRequest = PeriodicWorkRequestBuilder<DueDateCheckWorker>(
+        24, TimeUnit.HOURS
+    )
+        .setConstraints(constraints)
+        .build()
+
+    // Enqueue the work unique name ensures it doesn't duplicate if called multiple times
+    WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+        "DueDateCheckWork",
+        ExistingPeriodicWorkPolicy.KEEP, // Keeps the existing schedule if already running
+        workRequest
+    )
 }

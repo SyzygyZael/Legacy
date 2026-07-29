@@ -29,6 +29,7 @@ import com.kevinnesbitt.legacysecurefreelancercrm.variables.InvoiceStatus
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.SupportedCurrency
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import java.util.UUID
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -109,6 +110,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                                         amount = invoice.amount,
                                         issueDate = invoice.issueDate,
                                         dueDate = invoice.dueDate,
+                                        paidDate = invoice.paidDate,
                                         issueTo = invoice.issueTo,
                                         clientCompany = invoice.clientCompany,
                                         clientEmail = invoice.clientEmail,
@@ -237,6 +239,31 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun saveImageToInternalStorage(context: Context, bitmap: Bitmap) {
+        viewModelScope.launch(Dispatchers.IO) {
+            // 1. Create a unique file name so images don't overwrite each other
+            val fileName = "logo_${UUID.randomUUID()}.jpg"
+
+            // 2. Point to your app's private files directory
+            val file = File(context.filesDir, fileName)
+
+            // 3. Compress the bitmap and write it to the file
+            FileOutputStream(file).use { outputStream ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
+                outputStream.flush()
+            }
+
+            // 4. Return the absolute path as a String
+            dao.updateLogoPath(file.absolutePath)
+        }
+    }
+
+    // fun updateInvoiceLogoPath(path: String) {
+    //     viewModelScope.launch(Dispatchers.IO) {
+    //         dao.updateLogoPath(path)
+    //     }
+    // }
+
     fun createClient(name: String, company: String, email: String, telp: String, currency: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val currentClientsCount = dao.getAllClientsList().size
@@ -322,7 +349,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         selfAddress: String,
         selfEmail: String,
         selfTelephone: String,
-        taxPercentage: Double
+        taxPercentage: Double,
+        status: String
     ): Long {
         return withContext(Dispatchers.IO) {
             dao.insertInvoice(
@@ -340,7 +368,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     selfAddress = selfAddress,
                     selfEmail = selfEmail,
                     selfTelephone = selfTelephone,
-                    taxPercentage = taxPercentage
+                    taxPercentage = taxPercentage,
+                    status = status
                 )
             )
         }
@@ -640,24 +669,29 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
         /**
          * @param signatureText Optional handwritten-style signature at the bottom.
+         * @param logoBitmap Optional image to draw as a background watermark in the top right.
          */
         fun generate(
             context: Context,
             invoice: InvoiceData,
             currencySymbol: String,
             signatureText: String? = null,
+            logoBitmap: Bitmap? = null, // 👈 Added logo parameter
             fileName: String = "invoice_${invoice.invoiceNumber}.pdf"
         ): Uri {
+
             val document = PdfDocument()
             val pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH.toInt(), PAGE_HEIGHT.toInt(), 1).create()
             val page = document.startPage(pageInfo)
             val canvas = page.canvas
 
-            drawInvoice(canvas, invoice, currencySymbol, signatureText)
+            // 👈 Pass logo to the drawing function
+            drawInvoice(canvas, invoice, currencySymbol, signatureText, logoBitmap)
 
             document.finishPage(page)
 
             val file = File(context.cacheDir, fileName)
+
             FileOutputStream(file).use { document.writeTo(it) }
             document.close()
 
@@ -668,7 +702,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
-        private fun drawInvoice(canvas: Canvas, invoice: InvoiceData, currencySymbol: String, signatureText: String?) {
+        private fun drawInvoice(
+            canvas: Canvas,
+            invoice: InvoiceData,
+            currencySymbol: String,
+            signatureText: String?,
+            logoBitmap: Bitmap? // 👈 Added logo parameter
+        ) {
             val thinLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.BLACK
                 strokeWidth = 0.8f
@@ -707,8 +747,30 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             var y = 85f
 
             // ═══════════════════════════════════════════════════════
-            // HEADER
+            // HEADER & LOGO WATERMARK
             // ═══════════════════════════════════════════════════════
+
+            // 👈 DRAW LOGO FIRST (so it sits behind the text)
+            if (logoBitmap != null) {
+                val logoPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    alpha = 50 // Opacity: 0 is transparent, 255 is solid. 50 is ~20% opacity.
+                }
+
+                // Constrain the logo size so massive images don't ruin the PDF layout
+                val targetSize = 120f
+                val scale = targetSize / maxOf(logoBitmap.width, logoBitmap.height)
+                val scaledWidth = logoBitmap.width * scale
+                val scaledHeight = logoBitmap.height * scale
+
+                // Position in the top right corner
+                val logoX = MARGIN_RIGHT - scaledWidth
+                val logoY = 20f
+
+                val destRect = RectF(logoX, logoY, logoX + scaledWidth, logoY + scaledHeight)
+                canvas.drawBitmap(logoBitmap, null, destRect, logoPaint)
+            }
+
+            // Draw the rest of the header
             canvas.drawLine(MARGIN_LEFT, y, 310f, y, thinLinePaint)
             canvas.drawText("INVOICE", 330f, y + 8f, titlePaint)
 
@@ -736,6 +798,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             // ── Left: Pay To ──
             leftY += 26f
             canvas.drawText("PAY TO:", leftColX, leftY, labelPaint)
+
             leftY += 14f
             canvas.drawText(invoice.payTo, leftColX, leftY, bodyPaint)
             leftY += 12f
@@ -743,6 +806,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             leftY += 12f
             canvas.drawText(invoice.selfEmail, leftColX, leftY, bodyPaint)
             leftY += 12f
+
             canvas.drawText(invoice.selfTelephone, leftColX, leftY, bodyPaint)
 
             // ── Right: Invoice Details ──
@@ -751,6 +815,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
             canvas.drawText("INVOICE NO:", detailLabelX, rightY, labelPaint)
             drawRightAlignedText(canvas, invoice.invoiceNumber, detailValueX + 70f, rightY, bodyPaint)
+
             rightY += 14f
 
             canvas.drawText("DATE:", detailLabelX, rightY, labelPaint)
@@ -768,6 +833,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val tableTop = y
             val descX = MARGIN_LEFT
             val priceX = 330f
+
             val qtyX = 405f
             val totalX = MARGIN_RIGHT
 
@@ -785,6 +851,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
             var subtotal = 0.0
             invoice.items.forEach { item ->
+
                 val multiplier = when(item.quantity) {
                     0 -> 1
                     -1 -> 1
@@ -812,6 +879,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             canvas.drawLine(MARGIN_LEFT, y, MARGIN_RIGHT, y, boldLinePaint)
             y += 20f
 
+
             // ═══════════════════════════════════════════════════════
             // TOTALS
             // ═══════════════════════════════════════════════════════
@@ -837,15 +905,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             // ═══════════════════════════════════════════════════════
             signatureText?.let { sig ->
                 y += 70f
+
                 val sigPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = Color.BLACK
                     textSize = 22f
                     typeface = Typeface.create(Typeface.DEFAULT, Typeface.ITALIC)
                 }
+
                 val path = Path().apply {
                     moveTo(MARGIN_LEFT + 180f, y)
                     quadTo(MARGIN_LEFT + 260f, y - 10f, MARGIN_LEFT + 340f, y + 5f)
                 }
+
                 canvas.drawTextOnPath(sig, path, 0f, 0f, sigPaint)
             }
         }
@@ -919,6 +990,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val amount: Double,
         val issueDate: String,
         val dueDate: String,
+        val paidDate: String,
         val issueTo: String,
         val clientCompany: String,
         val clientEmail: String,

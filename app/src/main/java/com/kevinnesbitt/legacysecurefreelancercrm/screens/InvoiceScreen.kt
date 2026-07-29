@@ -84,6 +84,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import androidx.compose.ui.platform.LocalLocale
+import com.kevinnesbitt.legacysecurefreelancercrm.util.loadBitmapFromPath
 
 @Composable
 fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
@@ -107,12 +108,6 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
     val currentDate = LocalDate.now()
     val formatter = DateTimeFormatter.ofPattern(settings.dateFormat, LocalLocale.current.platformLocale)
     val currentDateStr = formatter.format(currentDate)
-
-    localInvoices.filter { invoice ->
-        currentDateStr > invoice.dueDate
-    }.forEach { dueInvoice ->
-        viewModel.updateInvoiceStatus(dueInvoice.id, InvoiceStatus.OVERDUE.name)
-    }
 
     val lazyListState = rememberLazyListState()
     val lazyListStateTwo = rememberLazyListState()
@@ -171,6 +166,14 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
     var showPriceDialog by remember { mutableStateOf(false) }
 
     val invoiceItems = items.filter { it.invoiceId == tempInvoiceId }
+
+    localInvoices.filter { invoice ->
+        currentDateStr > invoice.dueDate
+    }.forEach { dueInvoice ->
+        if (dueInvoice.status != InvoiceStatus.PAID.name && !isAddingInvoice) {
+            viewModel.updateInvoiceStatus(dueInvoice.id, InvoiceStatus.OVERDUE.name)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -266,7 +269,6 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
             state = lazyListState
         ) {
             items(localInvoices, key = { invoice -> invoice.id }) { invoice ->
-                android.util.Log.d("Id drawing", "invoice.id: ${invoice.id}")
                 android.util.Log.d("Invoice drawing", "invoice: $invoice")
 
                 Card(
@@ -370,14 +372,17 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                 val itemsForThisInvoice = items.filter { it.invoiceId == invoice.id }
 
                                 val invoice = localInvoices.find { it.id == invoice.id }?: HomeViewModel.InvoiceData(
-                                    0, 0, "", 0.0, "", "", "", "", "", "", "", "", "", "", "", 0.0, emptyList()
+                                    0, 0, "", 0.0, "", "", "", "", "", "", "", "", "", "", "", "", 0.0, emptyList()
                                 )
+
+                                val logoBitmap = loadBitmapFromPath(settings.invoiceLogoPath)
 
                                 val uri = HomeViewModel.InvoicePdfGenerator.generate(
                                     context = context,
                                     invoice = invoice.copy(items = itemsForThisInvoice),
                                     currencySymbol = currencySymbol,
-                                    signatureText = invoice.payTo // or null if you don't want a signature
+                                    signatureText = invoice.payTo,
+                                    logoBitmap = logoBitmap
                                 )
 
                                 sharePdf(context, uri)
@@ -449,7 +454,8 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                     selfAddress = tempSelfAddress,
                                     selfEmail = tempSelfEmail,
                                     selfTelephone = tempSelfTelephone,
-                                    taxPercentage = tempTaxPercentage
+                                    taxPercentage = tempTaxPercentage,
+                                    status = InvoiceStatus.DRAFT.name
                                 ).toInt()
 
                                 tempInvoiceId = newInvoiceId
@@ -488,6 +494,19 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                 if (!isEditingInvoice) {
                     viewModel.deleteInvoice(tempInvoiceId)
                 }
+
+                tempIssueDate = "--/--/----"
+                tempDueDate = "--/--/----"
+                // tempClientName = ""
+                // tempClientCompanyORAddress = ""
+                // tempClientEmail = ""
+                // tempClientTelephone = ""
+                // tempSelfName = ""
+                // tempSelfAddress = ""
+                // tempSelfEmail = ""
+                // tempSelfTelephone = ""
+                tempTaxPercentage = 0.0
+                // tempInvoiceId = 0
 
                 isEditingInvoice = false
                 isAddingInvoice = false
@@ -953,6 +972,19 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                     viewModel.deleteInvoice(tempInvoiceId)
                                 }
 
+                                tempIssueDate = "--/--/----"
+                                tempDueDate = "--/--/----"
+                                // tempClientName = ""
+                                // tempClientCompanyORAddress = ""
+                                // tempClientEmail = ""
+                                // tempClientTelephone = ""
+                                // tempSelfName = ""
+                                // tempSelfAddress = ""
+                                // tempSelfEmail = ""
+                                // tempSelfTelephone = ""
+                                tempTaxPercentage = 0.0
+                                // tempInvoiceId = 0
+
                                 isEditingInvoice = false
                                 isAddingInvoice = false
                             },
@@ -995,8 +1027,6 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                     subtotal + taxAmount
                                 }
 
-
-
                                 viewModel.updateInvoice(
                                     invoiceId = tempInvoiceId,
                                     invoiceNumber = invoiceNumber,
@@ -1012,13 +1042,8 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                     selfTelephone = tempSelfTelephone,
                                     taxPercentage = tempTaxPercentage,
                                     amount = amount,
-                                    status = when(tempStatus) {
-                                        "" -> InvoiceStatus.DRAFT.name
-                                        else -> tempStatus
-                                    }
+                                    status = tempStatus
                                 )
-
-                                android.util.Log.d("Amount on update", "amount: $amount")
 
                                 tempIssueDate = "--/--/----"
                                 tempDueDate = "--/--/----"
@@ -1026,10 +1051,10 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                                 tempClientCompanyORAddress = ""
                                 tempClientEmail = ""
                                 tempClientTelephone = ""
-                                tempSelfName = ""
-                                tempSelfAddress = ""
-                                tempSelfEmail = ""
-                                tempSelfTelephone = ""
+                                // tempSelfName = ""
+                                // tempSelfAddress = ""
+                                // tempSelfEmail = ""
+                                // tempSelfTelephone = ""
                                 tempTaxPercentage = 0.0
                                 // tempInvoiceId = 0
 

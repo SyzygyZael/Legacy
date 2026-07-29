@@ -40,7 +40,8 @@ data class ProjectDataEntity(
     val payRate: Double,
     val billingType: String,
     val budget: Double,
-    val orderIndex: Int
+    val orderIndex: Int,
+    val notified: Boolean = false
 )
 
 @Entity(tableName = "tasks")
@@ -50,7 +51,8 @@ data class TaskDataEntity(
     val description: String,
     val isCompleted: Boolean,
     val dueDate: String,
-    val orderIndex: Int
+    val orderIndex: Int,
+    val notified: Boolean = false
 )
 
 @Entity(tableName = "time_logs")
@@ -85,7 +87,8 @@ data class InvoiceEntity(
     val selfEmail: String,
     val selfTelephone: String,
     val status: String = InvoiceStatus.DRAFT.name,
-    val taxPercentage: Double
+    val taxPercentage: Double,
+    val notified: Boolean = false
 )
 
 @Entity(tableName = "invoice_item")
@@ -109,7 +112,11 @@ data class SettingsEntity(
     val selfEmail: String = "",
     val selfTelephone: String = "",
     val preferredCurrency: String = "USD",
-    val taxBracket: Double = 0.0
+    val taxBracket: Double = 0.0,
+    val invoiceLogoPath: String = "",
+    val projectWarnDays: Int = 5,
+    val taskWarnDays: Int = 5,
+    val invoiceWarnDays: Int = 5
 )
 
 @Dao
@@ -140,8 +147,14 @@ interface AppDao {
     @Query("SELECT * FROM invoices")
     fun getAllInvoices(): Flow<List<InvoiceEntity>>
 
+    @Query("SELECT * FROM invoices")
+    fun getAllInvoicesList(): List<InvoiceEntity>
+
     @Query("SELECT * FROM tasks ORDER BY orderIndex ASC")
     fun getAllTasks(): Flow<List<TaskDataEntity>>
+
+    @Query("SELECT * FROM tasks")
+    fun getAllTasksList(): List<TaskDataEntity>
 
     @Query("SELECT * FROM time_logs ORDER BY date DESC, startTime DESC")
     fun getAllTimeLogs(): Flow<List<TimeLogsEntity>>
@@ -149,14 +162,23 @@ interface AppDao {
     @Query("SELECT * FROM projects ORDER BY orderIndex ASC")
     fun getAllProjects(): Flow<List<ProjectDataEntity>>
 
+    @Query("SELECT * FROM projects")
+    fun getAllProjectsList(): List<ProjectDataEntity>
+
     @Query("SELECT * FROM clients ORDER BY orderIndex ASC")
     fun getAllClients(): Flow<List<ClientDataEntity>>
+
+    @Query("SELECT * FROM clients")
+    fun getAllClientsList(): List<ClientDataEntity>
 
     @Query("SELECT * FROM invoice_item")
     fun getAllInvoiceItems(): Flow<List<ItemEntity>>
 
     @Query("SELECT * FROM settings WHERE id = 1")
     fun getSettings(): Flow<SettingsEntity>
+
+    @Query("SELECT * FROM settings WHERE id = 1")
+    fun getSettingsEntity(): SettingsEntity
 
     @Query("SELECT * FROM settings WHERE id = 1")
     suspend fun getSettingsOnce(): SettingsEntity?
@@ -225,6 +247,9 @@ interface AppDao {
         taxBracket: Double
     )
 
+    @Query("UPDATE settings SET invoiceLogoPath = :path WHERE id = 1")
+    suspend fun updateLogoPath(path: String)
+
     // DELETE QUERIES
     @Query("DELETE FROM tasks WHERE id = :taskId")
     suspend fun deleteTask(taskId: Int)
@@ -250,9 +275,6 @@ interface AppDao {
 
     @Query("SELECT * FROM tasks WHERE projectId = :projectId")
     suspend fun getTasksFromProjectId(projectId: Int): List<TaskDataEntity>
-
-    @Query("SELECT * FROM clients")
-    suspend fun getAllClientsList(): List<ClientDataEntity>
 
     @Query("SELECT * FROM time_logs WHERE projectId = :projectId")
     suspend fun getTimeLogsFromProjectId(projectId: Int): List<TimeLogsEntity>
@@ -300,7 +322,7 @@ interface AppDao {
         ItemEntity::class,
         SettingsEntity::class
                          ],
-        version = 34
+        version = 37
     )
     abstract class AppDatabase : RoomDatabase() {
         abstract fun appDao(): AppDao
