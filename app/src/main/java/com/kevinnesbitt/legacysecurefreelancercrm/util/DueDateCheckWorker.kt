@@ -14,64 +14,91 @@ class DueDateCheckWorker(
 
     override suspend fun doWork(): Result {
         return try {
-            // 1. Get your database directly
             val database = AppDao.AppDatabase.getDatabase(applicationContext)
             val dao = database.appDao()
 
             val settings = dao.getSettingsEntity()
 
-            // 2. Fetch the projects directly from the DAO
+            val projectReminders = dao.getAllProjectRemindersList()
+            val taskReminders = dao.getAllTaskRemindersList()
+            val invoiceReminders = dao.getAllInvoiceRemindersList()
+
             val projects = dao.getAllProjectsList()
             val clients = dao.getAllClientsList()
+            val tasks = dao.getAllTasksList()
+            val invoices = dao.getAllInvoicesList()
 
-            // val currentDate = LocalDate.now()
-            val projectTargetDate = LocalDate.now().plusDays(5)
-            val taskTargetDate = LocalDate.now().plusDays(5)
-            val invoiceTargetDate = LocalDate.now().plusDays(5)
+            val currentDate = LocalDate.now()
 
-            val formatter = DateTimeFormatter.ofPattern(settings.dateFormat) // Adjust pattern if needed
+            val formatter = DateTimeFormatter.ofPattern(settings.dateFormat)
 
-            val projectTargetDateStr = formatter.format(projectTargetDate)
-            val taskTargetDateStr = formatter.format(taskTargetDate)
-            val invoiceTargetDateStr = formatter.format(invoiceTargetDate)
+            projectReminders.forEach { reminder ->
+                val targetDate = when (reminder.unit) {
+                    "Days" -> { currentDate.plusDays(reminder.numUnits.toLong()) }
+                    "Weeks" -> { currentDate.plusWeeks(reminder.numUnits.toLong()) }
+                    "Months" -> { currentDate.plusMonths(reminder.numUnits.toLong()) }
+                    else -> { currentDate.plusYears(reminder.numUnits.toLong()) }
+                }
 
-            // 3. Loop through your clean list of projects
-            for (project in projects) {
-                android.util.Log.d("WorkerCheck", "Checking project: ${project.title}, due date: ${project.deadLine}")
+                val targetDateStr = formatter.format(targetDate)
 
-                // 4. Trigger notification
-                if (project.deadLine == projectTargetDateStr) {
-                    NotificationHelper.showNotification(
-                        context = applicationContext,
-                        title = "Project Due Soon!",
-                        message = "Your project '${project.title}' is due in 5 days."
-                    )
+                for (project in projects) {
+                    android.util.Log.d("Checking project: ${project.title}", "Target Date: $targetDateStr, Project Deadline: ${project.deadLine}")
+
+                    // Trigger notification
+                    if (project.deadLine == targetDateStr) {
+                        NotificationHelper.showNotification(
+                            context = applicationContext,
+                            title = "Project Due Soon!",
+                            message = "Your project '${project.title}' is due in ${reminder.numUnits} ${if (reminder.numUnits == 1) reminder.unit.lowercase().dropLast(1) else reminder.unit.lowercase()}."
+                        )
+                    }
                 }
             }
 
-            val tasks = dao.getAllTasksList() // Query your tasks table from the DAO
-            for (task in tasks) {
-                if (task.dueDate == taskTargetDateStr) {
+            taskReminders.forEach { reminder ->
+                val targetDate = when (reminder.unit) {
+                    "Days" -> { currentDate.plusDays(reminder.numUnits.toLong()) }
+                    "Weeks" -> { currentDate.plusWeeks(reminder.numUnits.toLong()) }
+                    "Months" -> { currentDate.plusMonths(reminder.numUnits.toLong()) }
+                    else -> { currentDate.plusYears(reminder.numUnits.toLong()) }
+                }
 
-                    NotificationHelper.showNotification(
-                        context = applicationContext,
-                        title = "Task Due Soon!",
-                        message = "Your task '${task.description}' is due in 5 days."
-                    )
+                val targetDateStr = formatter.format(targetDate)
+
+                for (task in tasks) {
+                    if (task.dueDate == targetDateStr) {
+
+                        NotificationHelper.showNotification(
+                            context = applicationContext,
+                            title = "Task Due Soon!",
+                            message = "Your task '${task.description}' is due in ${reminder.numUnits} ${if (reminder.numUnits == 1) reminder.unit.lowercase().dropLast(1) else reminder.unit.lowercase()}."
+                        )
+                    }
                 }
             }
 
-            val invoices = dao.getAllInvoicesList() // Query your tasks table from the DAO
-            for (invoice in invoices) {
-                if (invoice.dueDate == invoiceTargetDateStr) {
-                    val thisProject = projects.find { it.id == invoice.projectId }
-                    val thisClient = clients.find { it.id == thisProject?.clientId }
+            invoiceReminders.forEach { reminder ->
+                val targetDate = when (reminder.unit) {
+                    "Days" -> { currentDate.plusDays(reminder.numUnits.toLong()) }
+                    "Weeks" -> { currentDate.plusWeeks(reminder.numUnits.toLong()) }
+                    "Months" -> { currentDate.plusMonths(reminder.numUnits.toLong()) }
+                    else -> { currentDate.plusYears(reminder.numUnits.toLong()) }
+                }
 
-                    NotificationHelper.showNotification(
-                        context = applicationContext,
-                        title = "Invoice Due Soon!",
-                        message = "'${thisClient?.name?: "No Name"}' has an invoice due in 5 days."
-                    )
+                val targetDateStr = formatter.format(targetDate)
+
+                for (invoice in invoices) {
+                    if (invoice.dueDate == targetDateStr) {
+                        val thisProject = projects.find { it.id == invoice.projectId }
+                        val thisClient = clients.find { it.id == thisProject?.clientId }
+
+                        NotificationHelper.showNotification(
+                            context = applicationContext,
+                            title = "Invoice Due Soon!",
+                            message = "'${thisClient?.name?: "No Name"}' has an invoice due in ${reminder.numUnits} ${if (reminder.numUnits == 1) reminder.unit.lowercase().dropLast(1) else reminder.unit.lowercase()}."
+                        )
+                    }
                 }
             }
 

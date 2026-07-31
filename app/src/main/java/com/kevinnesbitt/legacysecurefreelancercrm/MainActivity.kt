@@ -218,6 +218,10 @@ class MainActivity : ComponentActivity() {
                             ProfileScreen(viewModel, navController, innerPadding)
                         }
 
+                        composable("notifications") {
+                            NotificationsScreen(viewModel, navController, innerPadding)
+                        }
+
                         composable("settings") {
                             SettingsScreen(viewModel, navController, innerPadding)
                         }

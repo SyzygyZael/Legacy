@@ -194,6 +194,13 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
             navController = navController
         )
 
+        // Notifications
+        NavigationSettingsRow(
+            title = "Notifications",
+            navigateTo = "notifications",
+            navController = navController
+        )
+
         // Time Format
         DropdownSettingsRow(
             expanded = isChoosingTimeFormat,

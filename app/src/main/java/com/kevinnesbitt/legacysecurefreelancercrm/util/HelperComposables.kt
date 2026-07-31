@@ -1,6 +1,7 @@
 package com.kevinnesbitt.legacysecurefreelancercrm.util
 
 import android.annotation.SuppressLint
+import android.widget.Switch
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -64,11 +65,18 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
 import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import kotlinx.coroutines.launch
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.semantics.Role
 
 @Composable
 fun DialogBoxSkeleton(onDismissRequest: () -> Unit, width: Dp, height: Dp, content: @Composable (() -> Unit)) {
@@ -261,6 +269,56 @@ fun NavigationSettingsRow(title: String, navigateTo: String, navController: NavC
     }
 }
 
+@SuppressLint("ComposableNaming")
+@Composable
+fun SettingsRow(
+    title: String,
+    content: @Composable (RowScope.() -> Unit)
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(color = Color.White),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            modifier = Modifier.padding(21.dp),
+            fontSize = 18.sp,
+            color = Color.Black
+        )
+
+        content()
+    }
+}
+
+@Composable
+fun SwitchSettingsRow(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: ((Boolean) -> Unit)?
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            modifier = Modifier.padding(21.dp),
+            fontSize = 18.sp,
+            color = Color.Black
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = Modifier.padding(10.dp)
+        )
+    }
+}
+
 @Composable
 fun TextDropDown(
     text: String,
@@ -300,30 +358,6 @@ fun TextDropDown(
             tint = Color.Black,
             modifier = Modifier.rotate(rotationAngle)
         )
-    }
-}
-
-@SuppressLint("ComposableNaming")
-@Composable
-fun SettingsRow(
-    title: String,
-    content: @Composable (RowScope.() -> Unit)
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(color = Color.White),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = title,
-            modifier = Modifier.padding(21.dp),
-            fontSize = 18.sp,
-            color = Color.Black
-        )
-
-        content()
     }
 }
 
@@ -637,6 +671,43 @@ fun WaveBarChart(
                 drawText(
                     textLayoutResult = measuredText,
                     topLeft = Offset(textX, textY + 22)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun RadioButtonSingleSelection(
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    options: List<String>
+) {
+
+    // Note that Modifier.selectableGroup() is essential to ensure correct accessibility behavior
+    Column(modifier.selectableGroup()) {
+        options.forEach { option ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .selectable(
+                        selected = selected,
+                        onClick = onClick,
+                        role = Role.RadioButton
+                    )
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(
+                    selected = selected,
+                    onClick = null // null recommended for accessibility with screen readers
+                )
+                Text(
+                    text = option,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(start = 16.dp)
                 )
             }
         }

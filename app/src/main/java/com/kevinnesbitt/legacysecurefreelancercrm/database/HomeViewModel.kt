@@ -47,6 +47,36 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val settings = dao.getSettings()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsEntity())
 
+    val projectReminders: StateFlow<List<ProjectReminderData>> = dao.getAllProjectReminders().map { reminders ->
+        reminders.map { reminder ->
+            ProjectReminderData(
+                id = reminder.id,
+                numUnits = reminder.numUnits,
+                unit = reminder.unit
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val taskReminders: StateFlow<List<TaskReminderData>> = dao.getAllTaskReminders().map { reminders ->
+        reminders.map { reminder ->
+            TaskReminderData(
+                id = reminder.id,
+                numUnits = reminder.numUnits,
+                unit = reminder.unit
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val invoiceReminders: StateFlow<List<InvoiceReminderData>> = dao.getAllInvoiceReminders().map { reminders ->
+        reminders.map { reminder ->
+            InvoiceReminderData(
+                id = reminder.id,
+                numUnits = reminder.numUnits,
+                unit = reminder.unit
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val clientState: StateFlow<List<ClientData>> = combine(
         flow = dao.getAllProjects(),
         flow2 = dao.getAllTasks(),
@@ -235,6 +265,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 selfEmail = selfEmail,
                 currency = currency,
                 taxBracket = taxBracket
+            )
+        }
+    }
+
+    fun updateNotificationSettings(projectWarnDays: Int, taskWarnDays: Int, invoiceWarnDays: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.updateNotificationSettings(
+                projectWarnDays = projectWarnDays,
+                taskWarnDays = taskWarnDays,
+                invoiceWarnDays = invoiceWarnDays
             )
         }
     }
@@ -593,6 +633,61 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteTask(taskId: Int) {
         viewModelScope.launch {
             dao.deleteTask(taskId)
+        }
+    }
+
+    // REMINDERS
+    fun createProjectReminder(numUnits: Int, unit: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.insertProjectReminder(
+                ProjectReminderEntity(
+                    id = 0,
+                    numUnits = numUnits,
+                    unit = unit
+                )
+            )
+        }
+    }
+
+    fun createTaskReminder(numUnits: Int, unit: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.insertTaskReminder(
+                TaskReminderEntity(
+                    id = 0,
+                    numUnits = numUnits,
+                    unit = unit
+                )
+            )
+        }
+    }
+
+    fun createInvoiceReminder(numUnits: Int, unit: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.insertInvoiceReminder(
+                InvoiceReminderEntity(
+                    id = 0,
+                    numUnits = numUnits,
+                    unit = unit
+                )
+            )
+        }
+    }
+
+    fun deleteProjectReminder(reminderId: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.deleteProjectReminder(reminderId)
+        }
+    }
+
+    fun deleteTaskReminder(reminderId: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.deleteTaskReminder(reminderId)
+        }
+    }
+
+    fun deleteInvoiceReminder(reminderId: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.deleteInvoiceReminder(reminderId)
         }
     }
 
@@ -1010,5 +1105,23 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val name: String,
         val price: Double,
         val quantity: Int
+    )
+
+    data class ProjectReminderData(
+        val id: Int,
+        val numUnits: Int,
+        val unit: String
+    )
+
+    data class TaskReminderData(
+        val id: Int,
+        val numUnits: Int,
+        val unit: String
+    )
+
+    data class InvoiceReminderData(
+        val id: Int,
+        val numUnits: Int,
+        val unit: String
     )
 }

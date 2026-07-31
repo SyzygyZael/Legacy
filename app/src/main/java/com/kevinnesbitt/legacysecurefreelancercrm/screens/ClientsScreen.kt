@@ -67,6 +67,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Composable
 fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerPadding: PaddingValues) {
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
     val clientStates by viewModel.clientState.collectAsStateWithLifecycle()
 
     var localClientStates by remember(clientStates) { mutableStateOf(clientStates) }
@@ -82,7 +83,7 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
     var tempCompanyText by remember { mutableStateOf("") }
     var tempEmailText by remember { mutableStateOf("") }
     var tempTelpNum by remember { mutableStateOf("") }
-    var tempCurrency by remember { mutableStateOf("") }
+    var tempCurrency by remember { mutableStateOf("USD") }
 
     var isAddingClient by remember { mutableStateOf(false) }
     var expandCurrencyChoice by remember { mutableStateOf(false) }

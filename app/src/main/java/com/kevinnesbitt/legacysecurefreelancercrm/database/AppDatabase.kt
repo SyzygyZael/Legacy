@@ -100,6 +100,27 @@ data class ItemEntity(
     val quantity: Int
 )
 
+@Entity(tableName = "project_reminders")
+data class ProjectReminderEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int,
+    val numUnits: Int = 0,
+    val unit: String = "Days"
+)
+
+@Entity(tableName = "task_reminders")
+data class TaskReminderEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int,
+    val numUnits: Int = 0,
+    val unit: String = "Days"
+)
+
+@Entity(tableName = "invoice_reminders")
+data class InvoiceReminderEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int,
+    val numUnits: Int = 0,
+    val unit: String = "Days"
+)
+
 @Entity(tableName = "settings")
 data class SettingsEntity(
     @PrimaryKey(autoGenerate = false) val id: Int = 1,
@@ -141,6 +162,15 @@ interface AppDao {
     suspend fun insertItem(item: ItemEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertProjectReminder(reminder: ProjectReminderEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTaskReminder(reminder: TaskReminderEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertInvoiceReminder(reminder: InvoiceReminderEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSettings(settings: SettingsEntity)
 
     // "GET ALL" QUERIES
@@ -176,6 +206,24 @@ interface AppDao {
 
     @Query("SELECT * FROM settings WHERE id = 1")
     fun getSettings(): Flow<SettingsEntity>
+
+    @Query("SELECT * FROM project_reminders")
+    fun getAllProjectReminders(): Flow<List<ProjectReminderEntity>>
+
+    @Query("SELECT * FROM task_reminders")
+    fun getAllTaskReminders(): Flow<List<TaskReminderEntity>>
+
+    @Query("SELECT * FROM invoice_reminders")
+    fun getAllInvoiceReminders(): Flow<List<InvoiceReminderEntity>>
+
+    @Query("SELECT * FROM project_reminders")
+    fun getAllProjectRemindersList(): List<ProjectReminderEntity>
+
+    @Query("SELECT * FROM task_reminders")
+    fun getAllTaskRemindersList(): List<TaskReminderEntity>
+
+    @Query("SELECT * FROM invoice_reminders")
+    fun getAllInvoiceRemindersList(): List<InvoiceReminderEntity>
 
     @Query("SELECT * FROM settings WHERE id = 1")
     fun getSettingsEntity(): SettingsEntity
@@ -235,6 +283,15 @@ interface AppDao {
     @Query("UPDATE invoices SET paidDate = :paidDate WHERE id = :invoiceId")
     suspend fun updateInvoicePaidDate(invoiceId: Int, paidDate: String)
 
+    @Query("UPDATE project_reminders SET numUnits = :numUnits, unit = :unit WHERE id = :reminderId")
+    suspend fun updateProjectReminder(reminderId: Int, numUnits: Int, unit: String)
+
+    @Query("UPDATE task_reminders SET numUnits = :numUnits, unit = :unit WHERE id = :reminderId")
+    suspend fun updateTaskReminder(reminderId: Int, numUnits: Int, unit: String)
+
+    @Query("UPDATE invoice_reminders SET numUnits = :numUnits, unit = :unit WHERE id = :reminderId")
+    suspend fun updateInvoiceReminder(reminderId: Int, numUnits: Int, unit: String)
+
     @Query("UPDATE settings SET timeFormat = :timeFormat, dateFormat = :dateFormat, selfName = :selfName, selfAddress = :selfAddress, selfEmail = :selfEmail, selfTelephone = :selfTelephone, preferredCurrency = :currency, taxBracket = :taxBracket WHERE id = 1")
     suspend fun updateSettings(
         timeFormat: String,
@@ -249,6 +306,9 @@ interface AppDao {
 
     @Query("UPDATE settings SET invoiceLogoPath = :path WHERE id = 1")
     suspend fun updateLogoPath(path: String)
+
+    @Query("UPDATE settings SET projectWarnDays = :projectWarnDays, taskWarnDays = :taskWarnDays, invoiceWarnDays = :invoiceWarnDays WHERE id = 1")
+    suspend fun updateNotificationSettings(projectWarnDays: Int, taskWarnDays: Int, invoiceWarnDays: Int)
 
     // DELETE QUERIES
     @Query("DELETE FROM tasks WHERE id = :taskId")
@@ -265,6 +325,15 @@ interface AppDao {
 
     @Query("DELETE FROM invoices WHERE id = :invoiceId")
     suspend fun deleteInvoice(invoiceId: Int)
+
+    @Query("DELETE FROM project_reminders WHERE id = :reminderId")
+    suspend fun deleteProjectReminder(reminderId: Int)
+
+    @Query("DELETE FROM task_reminders WHERE id = :reminderId")
+    suspend fun deleteTaskReminder(reminderId: Int)
+
+    @Query("DELETE FROM invoice_reminders WHERE id = :reminderId")
+    suspend fun deleteInvoiceReminder(reminderId: Int)
 
     // OTHER QUERIES
     @Query("SELECT * FROM projects WHERE clientId = :clientId")
@@ -320,9 +389,12 @@ interface AppDao {
         TimeLogsEntity::class,
         InvoiceEntity::class,
         ItemEntity::class,
-        SettingsEntity::class
+        SettingsEntity::class,
+        ProjectReminderEntity::class,
+        TaskReminderEntity::class,
+        InvoiceReminderEntity::class
                          ],
-        version = 37
+        version = 39
     )
     abstract class AppDatabase : RoomDatabase() {
         abstract fun appDao(): AppDao
