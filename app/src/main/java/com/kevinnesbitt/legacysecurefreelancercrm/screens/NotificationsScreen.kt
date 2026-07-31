@@ -1,6 +1,5 @@
 package com.kevinnesbitt.legacysecurefreelancercrm.screens
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,7 +26,6 @@ import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,13 +39,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight.Companion.Bold
@@ -59,15 +55,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
 import com.kevinnesbitt.legacysecurefreelancercrm.util.DialogBox
-import com.kevinnesbitt.legacysecurefreelancercrm.util.RadioButtonSingleSelection
-import com.kevinnesbitt.legacysecurefreelancercrm.util.TextDropDown
 
 @Composable
 fun NotificationsScreen(viewModel: HomeViewModel, navController: NavController, innerPadding: PaddingValues) {
-    val settings by viewModel.settings.collectAsStateWithLifecycle()
-    val coroutineScope = rememberCoroutineScope()
-    val context = LocalContext.current
-
     val projectLazyListState = rememberLazyListState()
     val taskLazyListState = rememberLazyListState()
     val invoiceLazyListState = rememberLazyListState()
@@ -77,30 +67,13 @@ fun NotificationsScreen(viewModel: HomeViewModel, navController: NavController, 
     val invoiceReminders by viewModel.invoiceReminders.collectAsStateWithLifecycle()
 
     var tempProjectUnit by remember { mutableStateOf("") }
-    var tempTaskUnit by remember { mutableStateOf("") }
-    var tempInvoiceUnit by remember { mutableStateOf("") }
-
-    var tempReminderId by remember { mutableIntStateOf(0) }
 
     var tempProjectDays by remember { mutableIntStateOf(0) }
-    var tempTaskDays by remember { mutableIntStateOf(0) }
-    var tempInvoiceDays by remember { mutableIntStateOf(0) }
-
-    var expandProjectUnitChoices by remember { mutableStateOf(false) }
-    var expandTaskUnitChoices by remember { mutableStateOf(false) }
-    var expandInvoiceUnitChoices by remember { mutableStateOf(false) }
     var isAddingNotification by remember { mutableStateOf(false) }
 
     var projectNotification by remember { mutableStateOf(false) }
     var taskNotification by remember { mutableStateOf(false) }
     var invoiceNotification by remember { mutableStateOf(false) }
-
-    val changedSettings = when {
-        tempProjectDays != settings.projectWarnDays -> true
-        tempTaskDays != settings.taskWarnDays -> true
-        tempInvoiceDays != settings.invoiceWarnDays -> true
-        else -> false
-    }
 
     Column(
         modifier = Modifier
@@ -123,6 +96,7 @@ fun NotificationsScreen(viewModel: HomeViewModel, navController: NavController, 
             ) {
                 // filler padding
                 Button(
+                    enabled = false,
                     onClick = {  },
                     colors = ButtonColors(
                         containerColor = Color.White,
@@ -148,20 +122,12 @@ fun NotificationsScreen(viewModel: HomeViewModel, navController: NavController, 
 
                 // save button
                 Button(
-                    enabled = changedSettings,
-                    onClick = {
-                        viewModel.updateNotificationSettings(
-                            projectWarnDays = tempProjectDays,
-                            taskWarnDays = tempTaskDays,
-                            invoiceWarnDays = tempInvoiceDays
-                        )
-
-                        Toast.makeText(context, "Saved Changes", Toast.LENGTH_LONG).show()
-                    },
+                    enabled = false,
+                    onClick = {  },
                     colors = ButtonColors(
                         containerColor = Color.White,
-                        contentColor = Color.Black,
-                        disabledContentColor = Color.LightGray,
+                        contentColor = Color.White,
+                        disabledContentColor = Color.White,
                         disabledContainerColor = Color.White
                     )
                 ) {
@@ -206,13 +172,11 @@ fun NotificationsScreen(viewModel: HomeViewModel, navController: NavController, 
                             tint = Color.Black,
                             modifier = Modifier
                                 .size(20.dp)
-                                .padding(horizontal = 10.dp)
                         )
                         Text(
-                            text = "${reminder.numUnits} ${reminder.unit.lowercase()} before",
+                            text = "   ${reminder.numUnits} ${reminder.unit.lowercase()} before",
                             fontSize = 17.sp,
-                            color = Color.Black,
-                            fontWeight = Bold
+                            color = Color.Black
                         )
                     }
 
@@ -251,7 +215,7 @@ fun NotificationsScreen(viewModel: HomeViewModel, navController: NavController, 
                     Text(
                         text = "Add new notification",
                         fontSize = 18.sp,
-                        color = Color.Black
+                        color = Color.DarkGray
                     )
                 }
             }
@@ -289,13 +253,11 @@ fun NotificationsScreen(viewModel: HomeViewModel, navController: NavController, 
                             tint = Color.Black,
                             modifier = Modifier
                                 .size(20.dp)
-                                .padding(horizontal = 10.dp)
                         )
                         Text(
-                            text = "${reminder.numUnits} ${reminder.unit.lowercase()} before",
+                            text = "   ${reminder.numUnits} ${reminder.unit.lowercase()} before",
                             fontSize = 17.sp,
-                            color = Color.Black,
-                            fontWeight = Bold
+                            color = Color.Black
                         )
                     }
 
@@ -334,7 +296,7 @@ fun NotificationsScreen(viewModel: HomeViewModel, navController: NavController, 
                     Text(
                         text = "Add new notification",
                         fontSize = 18.sp,
-                        color = Color.Black
+                        color = Color.DarkGray
                     )
                 }
             }
@@ -372,13 +334,11 @@ fun NotificationsScreen(viewModel: HomeViewModel, navController: NavController, 
                             tint = Color.Black,
                             modifier = Modifier
                                 .size(20.dp)
-                                .padding(horizontal = 10.dp)
                         )
                         Text(
-                            text = "${reminder.numUnits} ${reminder.unit.lowercase()} before",
+                            text = "   ${reminder.numUnits} ${reminder.unit.lowercase()} before",
                             fontSize = 17.sp,
-                            color = Color.Black,
-                            fontWeight = Bold
+                            color = Color.Black
                         )
                     }
 
@@ -417,7 +377,7 @@ fun NotificationsScreen(viewModel: HomeViewModel, navController: NavController, 
                     Text(
                         text = "Add new notification",
                         fontSize = 18.sp,
-                        color = Color.Black
+                        color = Color.DarkGray
                     )
                 }
             }
