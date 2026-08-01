@@ -19,6 +19,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBackIosNew
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Button
@@ -95,20 +96,18 @@ fun NotificationsScreen(viewModel: HomeViewModel, navController: NavController, 
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // filler padding
-                Button(
-                    enabled = false,
-                    onClick = {  },
-                    colors = ButtonColors(
+                IconButton(
+                    onClick = { navController.navigate("settings") },
+                    colors = IconButtonDefaults.iconButtonColors(
                         containerColor = Color.White,
-                        contentColor = Color.White,
-                        disabledContentColor = Color.White,
-                        disabledContainerColor = Color.White
+                        contentColor = Color.Black
                     )
                 ) {
-                    Text(
-                        text = "Save",
-                        fontSize = 17.sp,
-                        fontWeight = Bold
+                    Icon(
+                        imageVector = Icons.Default.ArrowBackIosNew,
+                        contentDescription = "Back to Settings",
+                        tint = Color.Black,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
 

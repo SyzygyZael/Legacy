@@ -40,6 +40,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight.Companion.Bold
@@ -55,6 +57,7 @@ import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
 import com.kevinnesbitt.legacysecurefreelancercrm.util.DropdownSettingsRow
 import com.kevinnesbitt.legacysecurefreelancercrm.util.DueDateCheckWorker
 import com.kevinnesbitt.legacysecurefreelancercrm.util.NavigationSettingsRow
+import com.kevinnesbitt.legacysecurefreelancercrm.util.PersistingToastButton
 import com.kevinnesbitt.legacysecurefreelancercrm.util.SettingsRow
 import com.kevinnesbitt.legacysecurefreelancercrm.util.uriToBitmap
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.SupportedCurrency
@@ -65,6 +68,10 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    val windowInfo = LocalWindowInfo.current
+    val screenWidth = windowInfo.containerDpSize.width
+    // val screenHeight = windowInfo.containerDpSize.height
 
     var logoUri by remember { mutableStateOf<Uri?>(null) }
     var logoBitmap by remember { mutableStateOf<Bitmap?>(null) }
@@ -114,264 +121,293 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
         modifier = Modifier
             .fillMaxSize()
             .padding(innerPadding)
-            .background(color = Color(0xFFF2F2F2L)),
+            .background(color = Color.White),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Card(
-            elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
-            shape = RectangleShape
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(color = Color.White)
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Card(
+                elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
+                shape = RectangleShape
             ) {
-                // filler padding
-                Button(
-                    onClick = {  },
-                    colors = ButtonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.White,
-                        disabledContentColor = Color.White,
-                        disabledContainerColor = Color.White
-                    )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(color = Color.White)
+                        .padding(8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Save",
-                        fontSize = 17.sp,
-                        fontWeight = Bold
-                    )
-                }
-
-                Text(
-                    text = " Settings",
-                    fontSize = 25.sp,
-                    fontWeight = Bold,
-                    fontFamily = FontFamily.SansSerif,
-                    color = Color.Black
-                )
-
-                // save button
-                Button(
-                    enabled = changedSettings,
-                    onClick = {
-                        viewModel.updateSettings(
-                            timeFormat = timeFormatChoiceString,
-                            dateFormat = dateFormatChoiceString,
-                            selfName = settings.selfName,
-                            selfEmail = settings.selfEmail,
-                            selfAddress = settings.selfAddress,
-                            selfTelephone = settings.selfTelephone,
-                            currency = currencyChoiceString,
-                            taxBracket = tempTaxPercentage
+                    // filler padding
+                    Button(
+                        onClick = {  },
+                        colors = ButtonColors(
+                            containerColor = Color.White,
+                            contentColor = Color.White,
+                            disabledContentColor = Color.White,
+                            disabledContainerColor = Color.White
                         )
+                    ) {
+                        Text(
+                            text = "Save",
+                            fontSize = 17.sp,
+                            fontWeight = Bold
+                        )
+                    }
 
-                        Toast.makeText(context, "Saved Changes", Toast.LENGTH_LONG).show()
+                    Text(
+                        text = " Settings",
+                        fontSize = 25.sp,
+                        fontWeight = Bold,
+                        fontFamily = FontFamily.SansSerif,
+                        color = Color.Black
+                    )
+
+                    // save button
+                    Button(
+                        enabled = changedSettings,
+                        onClick = {
+                            viewModel.updateSettings(
+                                timeFormat = timeFormatChoiceString,
+                                dateFormat = dateFormatChoiceString,
+                                selfName = settings.selfName,
+                                selfEmail = settings.selfEmail,
+                                selfAddress = settings.selfAddress,
+                                selfTelephone = settings.selfTelephone,
+                                currency = currencyChoiceString,
+                                taxBracket = tempTaxPercentage
+                            )
+
+                            Toast.makeText(context, "Saved Changes", Toast.LENGTH_LONG).show()
+                        },
+                        colors = ButtonColors(
+                            containerColor = Color.White,
+                            contentColor = Color.Black,
+                            disabledContentColor = Color.LightGray,
+                            disabledContainerColor = Color.White
+                        )
+                    ) {
+                        Text(
+                            text = "Save",
+                            fontSize = 17.sp,
+                            fontWeight = Bold
+                        )
+                    }
+                }
+            }
+
+            // Profile
+            NavigationSettingsRow(
+                title = "Profile",
+                navigateTo = "profile",
+                navController = navController
+            )
+
+            // Notifications
+            NavigationSettingsRow(
+                title = "Notifications",
+                navigateTo = "notifications",
+                navController = navController
+            )
+
+            // Time Format
+            DropdownSettingsRow(
+                expanded = isChoosingTimeFormat,
+                onDismissRequest = { isChoosingTimeFormat = false },
+                title = "Time Format",
+                value = timeFormatChoiceString,
+                onClick = { isChoosingTimeFormat = true }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("12-Hour") },
+                    onClick = {
+                        timeFormatChoiceString = "12-Hour"
+                        isChoosingTimeFormat = false
+                    }
+                )
+
+                DropdownMenuItem(
+                    text = { Text("24-Hour") },
+                    onClick = {
+                        timeFormatChoiceString = "24-Hour"
+                        isChoosingTimeFormat = false
+                    }
+                )
+            }
+
+            // Date Format
+            DropdownSettingsRow(
+                expanded = isChoosingDateFormat,
+                onDismissRequest = { isChoosingDateFormat = false },
+                title = "Date Format",
+                value = dateFormatChoiceString,
+                onClick = { isChoosingDateFormat = true },
+                width = 128.dp
+            ) {
+                if (dateFormatChoiceString != "MM/dd/yyyy") {
+                    DropdownMenuItem(
+                        text = { Text("MM/dd/yyyy") },
+                        onClick = {
+                            dateFormatChoiceString = "MM/dd/yyyy"
+                            isChoosingDateFormat = false
+                        }
+                    )
+                }
+
+                if (dateFormatChoiceString != "dd/MM/yyyy") {
+                    DropdownMenuItem(
+                        text = { Text("dd/MM/yyyy") },
+                        onClick = {
+                            dateFormatChoiceString = "dd/MM/yyyy"
+                            isChoosingDateFormat = false
+                        }
+                    )
+                }
+
+                if (dateFormatChoiceString != "yyyy-MM-dd") {
+                    DropdownMenuItem(
+                        text = { Text("yyyy-MM-dd") },
+                        onClick = {
+                            dateFormatChoiceString = "yyyy-MM-dd"
+                            isChoosingDateFormat = false
+                        }
+                    )
+                }
+
+                if (dateFormatChoiceString != "yyyy/MM/dd") {
+                    DropdownMenuItem(
+                        text = { Text("yyyy/MM/dd") },
+                        onClick = {
+                            dateFormatChoiceString = "yyyy/MM/dd"
+                            isChoosingDateFormat = false
+                        }
+                    )
+                }
+            }
+
+            // Dashboard Currency
+            DropdownSettingsRow(
+                expanded = isChoosingCurrency,
+                onDismissRequest = { isChoosingCurrency = false },
+                title = "Dashboard Currency",
+                value = currencyChoiceString,
+                onClick = { isChoosingCurrency = true }
+            ) {
+                SupportedCurrency.entries.forEach { currency ->
+                    DropdownMenuItem(
+                        text = { Text(currency.code) },
+                        onClick = {
+                            currencyChoiceString = currency.code
+                            isChoosingCurrency = false
+                        }
+                    )
+                }
+            }
+
+            // Tax Bracket
+            SettingsRow(
+                title = "Tax Bracket"
+            ) {
+                OutlinedTextField(
+                    value = if (tempTaxPercentage == 0.0) "" else tempTaxPercentage.toString(),
+                    onValueChange = { text ->
+                        val isValidDecimal = text.count { it == '.' } <= 1 &&
+                                text.all { it.isDigit() || it == '.' }
+                        if (isValidDecimal) {
+                            tempTaxPercentage = text.toDoubleOrNull() ?: 0.0
+                        }
                     },
-                    colors = ButtonColors(
-                        containerColor = Color.White,
+                    singleLine = true,
+                    modifier = Modifier
+                        .size(135.dp, 70.dp)
+                        .padding(8.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    textStyle = TextStyle(
+                        textAlign = TextAlign.Center,
+                        fontSize = 20.sp
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    trailingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Percent,
+                            contentDescription = "Tax Bracket",
+                            tint = Color.Black,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                )
+            }
+
+            // Invoice Logo Upload
+            SettingsRow(
+                title = "Upload Invoice Logo"
+            ) {
+                Button(
+                    onClick = {
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(
                         contentColor = Color.Black,
-                        disabledContentColor = Color.LightGray,
-                        disabledContainerColor = Color.White
+                        containerColor = Color.White
                     )
                 ) {
                     Text(
-                        text = "Save",
-                        fontSize = 17.sp,
-                        fontWeight = Bold
+                        text = "Upload",
+                        fontWeight = Bold,
+                        fontSize = 18.sp,
+                        color = Color.Black
                     )
                 }
             }
-        }
 
-        // Profile
-        NavigationSettingsRow(
-            title = "Profile",
-            navigateTo = "profile",
-            navController = navController
-        )
-
-        // Notifications
-        NavigationSettingsRow(
-            title = "Notifications",
-            navigateTo = "notifications",
-            navController = navController
-        )
-
-        // Time Format
-        DropdownSettingsRow(
-            expanded = isChoosingTimeFormat,
-            onDismissRequest = { isChoosingTimeFormat = false },
-            title = "Time Format",
-            value = timeFormatChoiceString,
-            onClick = { isChoosingTimeFormat = true }
-        ) {
-            DropdownMenuItem(
-                text = { Text("12-Hour") },
-                onClick = {
-                    timeFormatChoiceString = "12-Hour"
-                }
-            )
-
-            DropdownMenuItem(
-                text = { Text("24-Hour") },
-                onClick = {
-                    timeFormatChoiceString = "24-Hour"
-                }
-            )
-        }
-
-        // Date Format
-        DropdownSettingsRow(
-            expanded = isChoosingDateFormat,
-            onDismissRequest = { isChoosingDateFormat = false },
-            title = "Date Format",
-            value = dateFormatChoiceString,
-            onClick = { isChoosingDateFormat = true },
-            width = 128.dp
-        ) {
-            if (dateFormatChoiceString != "MM/dd/yyyy") {
-                DropdownMenuItem(
-                    text = { Text("MM/dd/yyyy") },
-                    onClick = {
-                        dateFormatChoiceString = "MM/dd/yyyy"
-                        isChoosingDateFormat = false
-                    }
-                )
-            }
-
-            if (dateFormatChoiceString != "dd/MM/yyyy") {
-                DropdownMenuItem(
-                    text = { Text("dd/MM/yyyy") },
-                    onClick = {
-                        dateFormatChoiceString = "dd/MM/yyyy"
-                        isChoosingDateFormat = false
-                    }
-                )
-            }
-
-            if (dateFormatChoiceString != "yyyy-MM-dd") {
-                DropdownMenuItem(
-                    text = { Text("yyyy-MM-dd") },
-                    onClick = {
-                        dateFormatChoiceString = "yyyy-MM-dd"
-                        isChoosingDateFormat = false
-                    }
-                )
-            }
-
-            if (dateFormatChoiceString != "yyyy/MM/dd") {
-                DropdownMenuItem(
-                    text = { Text("yyyy/MM/dd") },
-                    onClick = {
-                        dateFormatChoiceString = "yyyy/MM/dd"
-                        isChoosingDateFormat = false
-                    }
-                )
-            }
-        }
-
-        // Dashboard Currency
-        DropdownSettingsRow(
-            expanded = isChoosingCurrency,
-            onDismissRequest = { isChoosingCurrency = false },
-            title = "Dashboard Currency",
-            value = currencyChoiceString,
-            onClick = { isChoosingCurrency = true }
-        ) {
-            SupportedCurrency.entries.forEach { currency ->
-                DropdownMenuItem(
-                    text = { Text(currency.code) },
-                    onClick = {
-                        currencyChoiceString = currency.code
-                        isChoosingCurrency = false
-                    }
-                )
-            }
-        }
-
-        // Tax Bracket
-        SettingsRow(
-            title = "Tax Bracket"
-        ) {
-            OutlinedTextField(
-                value = if (tempTaxPercentage == 0.0) "" else tempTaxPercentage.toString(),
-                onValueChange = { text ->
-                    val isValidDecimal = text.count { it == '.' } <= 1 &&
-                            text.all { it.isDigit() || it == '.' }
-                    if (isValidDecimal) {
-                        tempTaxPercentage = text.toDoubleOrNull() ?: 0.0
-                    }
-                },
-                singleLine = true,
-                modifier = Modifier
-                    .size(135.dp, 70.dp)
-                    .padding(8.dp),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                textStyle = TextStyle(
-                    textAlign = TextAlign.Center,
-                    fontSize = 20.sp
-                ),
-                shape = RoundedCornerShape(8.dp),
-                trailingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Percent,
-                        contentDescription = "Tax Bracket",
-                        tint = Color.Black,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            )
-        }
-
-        // Invoice Logo Upload
-        SettingsRow(
-            title = "Upload Invoice Logo"
-        ) {
-            Button(
-                onClick = {
-                    photoPickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )
-                },
-                colors = ButtonDefaults.buttonColors(
-                    contentColor = Color.Black,
-                    containerColor = Color.White
-                )
+            // Test Notifications
+            SettingsRow(
+                title = "Test Notifications"
             ) {
-                Text(
-                    text = "Upload",
-                    fontWeight = Bold,
-                    fontSize = 18.sp,
-                    color = Color.Black
-                )
+                Button(
+                    onClick = {
+                        val testRequest = OneTimeWorkRequestBuilder<DueDateCheckWorker>().build()
+                        WorkManager.getInstance(context).enqueue(testRequest)
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        contentColor = Color.Black,
+                        containerColor = Color.White
+                    )
+                ) {
+                    Text(
+                        text = "Test",
+                        fontWeight = Bold,
+                        fontSize = 18.sp,
+                        color = Color.Black
+                    )
+                }
             }
         }
 
-        // Test Notifications
-        SettingsRow(
-            title = "Test Notifications"
-        ) {
-            Button(
-                onClick = {
-                    val testRequest = OneTimeWorkRequestBuilder<DueDateCheckWorker>().build()
-                    WorkManager.getInstance(context).enqueue(testRequest)
-                },
-                colors = ButtonDefaults.buttonColors(
-                    contentColor = Color.Black,
-                    containerColor = Color.White
+        PersistingToastButton(
+            show = changedSettings,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .background(color = Color.White),
+            onClick = {
+                viewModel.updateSettings(
+                    timeFormat = timeFormatChoiceString,
+                    dateFormat = dateFormatChoiceString,
+                    selfName = settings.selfName,
+                    selfEmail = settings.selfEmail,
+                    selfAddress = settings.selfAddress,
+                    selfTelephone = settings.selfTelephone,
+                    currency = currencyChoiceString,
+                    taxBracket = tempTaxPercentage
                 )
-            ) {
-                Text(
-                    text = "Test",
-                    fontWeight = Bold,
-                    fontSize = 18.sp,
-                    color = Color.Black
-                )
+
+                Toast.makeText(context, "Saved Changes", Toast.LENGTH_LONG).show()
             }
-        }
+        )
     }
 }

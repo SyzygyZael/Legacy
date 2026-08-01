@@ -134,10 +134,7 @@ data class SettingsEntity(
     val selfTelephone: String = "",
     val preferredCurrency: String = "USD",
     val taxBracket: Double = 0.0,
-    val invoiceLogoPath: String = "",
-    val projectWarnDays: Int = 5,
-    val taskWarnDays: Int = 5,
-    val invoiceWarnDays: Int = 5
+    val invoiceLogoPath: String = ""
 )
 
 @Dao
@@ -307,9 +304,6 @@ interface AppDao {
     @Query("UPDATE settings SET invoiceLogoPath = :path WHERE id = 1")
     suspend fun updateLogoPath(path: String)
 
-    @Query("UPDATE settings SET projectWarnDays = :projectWarnDays, taskWarnDays = :taskWarnDays, invoiceWarnDays = :invoiceWarnDays WHERE id = 1")
-    suspend fun updateNotificationSettings(projectWarnDays: Int, taskWarnDays: Int, invoiceWarnDays: Int)
-
     // DELETE QUERIES
     @Query("DELETE FROM tasks WHERE id = :taskId")
     suspend fun deleteTask(taskId: Int)
@@ -394,7 +388,7 @@ interface AppDao {
         TaskReminderEntity::class,
         InvoiceReminderEntity::class
                          ],
-        version = 39
+        version = 40
     )
     abstract class AppDatabase : RoomDatabase() {
         abstract fun appDao(): AppDao

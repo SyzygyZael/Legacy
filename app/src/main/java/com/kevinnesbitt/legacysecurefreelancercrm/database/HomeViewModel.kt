@@ -269,16 +269,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun updateNotificationSettings(projectWarnDays: Int, taskWarnDays: Int, invoiceWarnDays: Int) {
-        viewModelScope.launch(Dispatchers.IO) {
-            dao.updateNotificationSettings(
-                projectWarnDays = projectWarnDays,
-                taskWarnDays = taskWarnDays,
-                invoiceWarnDays = invoiceWarnDays
-            )
-        }
-    }
-
     fun saveImageToInternalStorage(context: Context, bitmap: Bitmap) {
         viewModelScope.launch(Dispatchers.IO) {
             // 1. Create a unique file name so images don't overwrite each other

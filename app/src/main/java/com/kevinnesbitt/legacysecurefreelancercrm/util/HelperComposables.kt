@@ -2,6 +2,8 @@ package com.kevinnesbitt.legacysecurefreelancercrm.util
 
 import android.annotation.SuppressLint
 import android.widget.Switch
+import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -65,18 +67,24 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import kotlinx.coroutines.launch
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Density
 
 @Composable
 fun DialogBoxSkeleton(onDismissRequest: () -> Unit, width: Dp, height: Dp, content: @Composable (() -> Unit)) {
@@ -709,6 +717,66 @@ fun RadioButtonSingleSelection(
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(start = 16.dp)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun PersistingToastButton(
+    show: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Bottom
+    ) {
+        val density = LocalDensity.current
+
+        AnimatedVisibility(
+            visible = show,
+            enter = slideInVertically { with(density) { 60.dp.roundToPx() } },
+            exit = slideOutVertically { with(density) { 120.dp.roundToPx() } }
+        ) {
+            Card(
+                elevation = CardDefaults.cardElevation(5.dp),
+                shape = RoundedCornerShape(15.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.Cyan,
+                    contentColor = Color.Black
+                ),
+                modifier = Modifier.padding(bottom = 20.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(8.dp)
+                ) {
+                    Text(
+                        text = "You have unsaved changes!",
+                        fontSize = 17.sp,
+                        color = Color.Black
+                    )
+
+                    Button(
+                        onClick = onClick,
+                        colors = ButtonDefaults.buttonColors(
+                            contentColor = Color.White,
+                            containerColor = Color.Green
+                        ),
+                        shape = RoundedCornerShape(7.dp),
+                        modifier = Modifier.padding(start = 30.dp)
+                    ) {
+                        Text(
+                            text = "Save",
+                            fontSize = 15.sp,
+                            fontWeight = Bold,
+                            color = Color.White
+                        )
+                    }
+                }
             }
         }
     }

@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight.Companion.Bold
 import androidx.compose.ui.text.input.ImeAction
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
+import com.kevinnesbitt.legacysecurefreelancercrm.util.PersistingToastButton
 
 @Composable
 fun ProfileScreen(viewModel: HomeViewModel, navController: NavController, innerPadding: PaddingValues) {
@@ -65,162 +67,191 @@ fun ProfileScreen(viewModel: HomeViewModel, navController: NavController, innerP
             .background(color = Color(0xFFF2F2F2L)),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Card(
-            elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
-            shape = RectangleShape
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(color = Color.White)
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Card(
+                elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
+                shape = RectangleShape
             ) {
-                // back button
-                IconButton(
-                    onClick = { navController.navigate("settings") },
-                    colors = IconButtonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Black,
-                        disabledContentColor = Color.Black,
-                        disabledContainerColor = Color.White
-                    )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(color = Color.White)
+                        .padding(8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBackIosNew,
-                        contentDescription = "Back Button",
-                        modifier = Modifier
-                            .size(20.dp),
-                        tint = Color.Black
-                    )
-                }
-
-                Text(
-                    text = " Profile",
-                    fontSize = 25.sp,
-                    fontWeight = Bold,
-                    fontFamily = FontFamily.SansSerif,
-                    color = Color.Black
-                )
-
-                // save button
-                Button(
-                    enabled = changedValue,
-                    onClick = {
-                        viewModel.updateSettings(
-                            timeFormat = settings.timeFormat,
-                            dateFormat = settings.dateFormat,
-                            selfName = tempName,
-                            selfAddress = tempAddress,
-                            selfEmail = tempEmail,
-                            selfTelephone = tempTelephone,
-                            currency = settings.preferredCurrency,
-                            taxBracket = settings.taxBracket
+                    // back button
+                    IconButton(
+                        onClick = { navController.navigate("settings") },
+                        colors = IconButtonColors(
+                            containerColor = Color.White,
+                            contentColor = Color.Black,
+                            disabledContentColor = Color.Black,
+                            disabledContainerColor = Color.White
                         )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBackIosNew,
+                            contentDescription = "Back Button",
+                            modifier = Modifier
+                                .size(20.dp),
+                            tint = Color.Black
+                        )
+                    }
 
-                        Toast.makeText(context, "Saved Changes", Toast.LENGTH_LONG).show()
-
-                        changedValue = false
-                    },
-                    colors = ButtonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Black,
-                        disabledContentColor = Color.LightGray,
-                        disabledContainerColor = Color.White
-                    )
-                ) {
                     Text(
-                        text = "Save",
-                        fontSize = 17.sp,
-                        fontWeight = Bold
+                        text = " Profile",
+                        fontSize = 25.sp,
+                        fontWeight = Bold,
+                        fontFamily = FontFamily.SansSerif,
+                        color = Color.Black
                     )
+
+                    // save button
+                    Button(
+                        enabled = changedValue,
+                        onClick = {
+                            viewModel.updateSettings(
+                                timeFormat = settings.timeFormat,
+                                dateFormat = settings.dateFormat,
+                                selfName = tempName,
+                                selfAddress = tempAddress,
+                                selfEmail = tempEmail,
+                                selfTelephone = tempTelephone,
+                                currency = settings.preferredCurrency,
+                                taxBracket = settings.taxBracket
+                            )
+
+                            Toast.makeText(context, "Saved Changes", Toast.LENGTH_LONG).show()
+
+                            changedValue = false
+                        },
+                        colors = ButtonColors(
+                            containerColor = Color.White,
+                            contentColor = Color.Black,
+                            disabledContentColor = Color.LightGray,
+                            disabledContainerColor = Color.White
+                        )
+                    ) {
+                        Text(
+                            text = "Save",
+                            fontSize = 17.sp,
+                            fontWeight = Bold
+                        )
+                    }
                 }
             }
+
+            OutlinedTextField(
+                value = tempName,
+                label = { Text("Name") },
+                onValueChange = { text ->
+                    if (tempName.length <= 50) {
+                        tempName = text
+                        changedValue = true
+                    }
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                singleLine = true,
+                modifier = Modifier
+                    .padding(
+                        start = 10.dp,
+                        end = 60.dp,
+                        top = 15.dp
+                    )
+                    .fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = tempAddress,
+                label = { Text("Address") },
+                onValueChange = { text ->
+                    tempAddress = text
+                    changedValue = true
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                singleLine = true,
+                modifier = Modifier
+                    .padding(
+                        start = 10.dp,
+                        end = 60.dp,
+                        top = 15.dp
+                    )
+                    .fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = tempEmail,
+                label = { Text("Email") },
+                onValueChange = { text ->
+                    tempEmail = text
+                    changedValue = true
+                },
+                keyboardOptions = KeyboardOptions(
+                    imeAction = ImeAction.Next,
+                    keyboardType = KeyboardType.Email
+                ),
+                singleLine = true,
+                modifier = Modifier
+                    .padding(
+                        start = 10.dp,
+                        end = 60.dp,
+                        top = 15.dp
+                    )
+                    .fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = tempTelephone,
+                label = { Text("Telephone") },
+                onValueChange = { text ->
+                    val isValidDecimal = text.count { it == '+' } <= 1 &&
+                            text.all { it.isDigit() || it == '+' }
+                    if (isValidDecimal) {
+                        tempTelephone = text
+                        changedValue = true
+                    }
+                },
+                keyboardOptions = KeyboardOptions(
+                    imeAction = ImeAction.Next,
+                    keyboardType = KeyboardType.Phone
+                ),
+                singleLine = true,
+                modifier = Modifier
+                    .padding(
+                        start = 10.dp,
+                        end = 60.dp,
+                        top = 15.dp
+                    )
+                    .fillMaxWidth()
+            )
         }
 
-        OutlinedTextField(
-            value = tempName,
-            label = { Text("Name") },
-            onValueChange = { text ->
-                if (tempName.length <= 50) {
-                    tempName = text
-                    changedValue = true
-                }
-            },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-            singleLine = true,
+        PersistingToastButton(
+            show = changedValue,
             modifier = Modifier
-                .padding(
-                    start = 10.dp,
-                    end = 60.dp,
-                    top = 15.dp
-                )
                 .fillMaxWidth()
-        )
+                .weight(1f)
+                .background(color = Color.White),
+            onClick = {
+                viewModel.updateSettings(
+                    timeFormat = settings.timeFormat,
+                    dateFormat = settings.dateFormat,
+                    selfName = tempName,
+                    selfAddress = tempAddress,
+                    selfEmail = tempEmail,
+                    selfTelephone = tempTelephone,
+                    currency = settings.preferredCurrency,
+                    taxBracket = settings.taxBracket
+                )
 
-        OutlinedTextField(
-            value = tempAddress,
-            label = { Text("Address") },
-            onValueChange = { text ->
-                tempAddress = text
-                changedValue = true
-            },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-            singleLine = true,
-            modifier = Modifier
-                .padding(
-                    start = 10.dp,
-                    end = 60.dp,
-                    top = 15.dp
-                )
-                .fillMaxWidth()
-        )
+                Toast.makeText(context, "Saved Changes", Toast.LENGTH_LONG).show()
 
-        OutlinedTextField(
-            value = tempEmail,
-            label = { Text("Email") },
-            onValueChange = { text ->
-                tempEmail = text
-                changedValue = true
-            },
-            keyboardOptions = KeyboardOptions(
-                imeAction = ImeAction.Next,
-                keyboardType = KeyboardType.Email
-            ),
-            singleLine = true,
-            modifier = Modifier
-                .padding(
-                start = 10.dp,
-                end = 60.dp,
-                top = 15.dp
-                )
-                .fillMaxWidth()
-        )
-
-        OutlinedTextField(
-            value = tempTelephone,
-            label = { Text("Telephone") },
-            onValueChange = { text ->
-                val isValidDecimal = text.count { it == '+' } <= 1 &&
-                        text.all { it.isDigit() || it == '+' }
-                if (isValidDecimal) {
-                    tempTelephone = text
-                    changedValue = true
-                }
-            },
-            keyboardOptions = KeyboardOptions(
-                imeAction = ImeAction.Next,
-                keyboardType = KeyboardType.Phone
-            ),
-            singleLine = true,
-            modifier = Modifier
-                .padding(
-                start = 10.dp,
-                end = 60.dp,
-                top = 15.dp
-                )
-                .fillMaxWidth()
+                changedValue = false
+            }
         )
     }
 }
