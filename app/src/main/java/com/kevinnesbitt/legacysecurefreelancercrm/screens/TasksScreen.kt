@@ -381,7 +381,7 @@ fun TasksScreen(projectName: String, projectId: Int, clientId: Int, viewModel: H
                     )
 
                     OutlinedTextField(
-                        value = selectedDate,
+                        value = tempTaskDeadline,
                         onValueChange = { },
                         label = { Text("Task Deadline") },
                         readOnly = true,

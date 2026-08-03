@@ -75,6 +75,7 @@ import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
 import com.kevinnesbitt.legacysecurefreelancercrm.util.convertMillisToDate
 import com.kevinnesbitt.legacysecurefreelancercrm.util.getCurrencySymbol
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.BillingType
+import com.kevinnesbitt.legacysecurefreelancercrm.variables.InvoiceStatus
 
 @Composable
 fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hubTab: String, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
@@ -96,6 +97,16 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
     val selectedDate = datePickerState.selectedDateMillis?.let {
         convertMillisToDate(it, settings)
     } ?: ""
+
+    val tasks = project?.tasks?: emptyList()
+    val currentTask = when(tasks) {
+        emptyList<HomeViewModel.TaskData>() -> HomeViewModel.TaskData(id = -1, description = "No Tasks", projectId = -1, isCompleted = false, dueDate = "")
+        else -> tasks.first()
+    }
+
+    val pendingInvoices = (project?.invoices?: emptyList()).filter { invoice -> invoice.status == InvoiceStatus.SENT.name }
+    val totalEarnings = (project?.invoices?: emptyList()).filter { invoice -> invoice.status == InvoiceStatus.PAID.name }
+        .sumOf { paidInvoice -> paidInvoice.amount }
 
     var tempProjectTitle by remember { mutableStateOf("") }
     var tempProjectDescription by remember { mutableStateOf("") }
@@ -366,29 +377,29 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "0",
+                            text = "${currencySymbol}$totalEarnings",
                             fontSize = 20.sp,
                             fontWeight = Bold,
                             color = Color.Black
                         )
 
-                        Surface(
-                            modifier = Modifier
-                                .size(52.dp, 20.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFF98FF98L).copy(alpha = 0.2f)
-                        ) {
-                            Text(
-                                text = "^ +0.0%",
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .padding(2.dp),
-                                color = Color(0xFF228B22L),
-                                textAlign = TextAlign.Center,
-                                fontWeight = Bold,
-                                fontSize = 11.sp
-                            )
-                        }
+                        // Surface(
+                        //     modifier = Modifier
+                        //         .size(52.dp, 20.dp),
+                        //     shape = RoundedCornerShape(8.dp),
+                        //     color = Color(0xFF98FF98L).copy(alpha = 0.2f)
+                        // ) {
+                        //     Text(
+                        //         text = "^ +0.0%",
+                        //         modifier = Modifier
+                        //             .size(10.dp)
+                        //             .padding(2.dp),
+                        //         color = Color(0xFF228B22L),
+                        //         textAlign = TextAlign.Center,
+                        //         fontWeight = Bold,
+                        //         fontSize = 11.sp
+                        //     )
+                        // }
                     }
                 }
             }
@@ -496,7 +507,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "Task name",
+                            text = currentTask.description,
                             fontSize = 20.sp,
                             fontWeight = Bold,
                             color = Color.Black
@@ -552,7 +563,7 @@ fun ProjectOverviewScreen(projectName: String, projectId: Int, clientId: Int, hu
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "0",
+                            text = pendingInvoices.size.toString(),
                             fontSize = 20.sp,
                             fontWeight = Bold,
                             color = Color.Black

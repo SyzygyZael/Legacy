@@ -452,6 +452,42 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun deleteClient(clientId: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.deleteClient(clientId)
+        }
+    }
+
+    fun deleteProject(projectId: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.deleteProject(projectId)
+        }
+    }
+
+    fun deleteProjectsUnderClient(clientId: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.deleteProjectsUnderClient(clientId)
+        }
+    }
+
+    fun deleteTasksUnderProject(projectId: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.deleteTasksUnderProject(projectId)
+        }
+    }
+
+    fun deleteTimeLogsUnderProject(projectId: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.deleteTimeLogsUnderProject(projectId)
+        }
+    }
+
+    fun deleteInvoicesUnderProject(projectId: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.deleteInvoicesUnderProject(projectId)
+        }
+    }
+
     // fun getInvoice(invoiceId: Int) {
     //     viewModelScope.launch(Dispatchers.IO) {
     //         dao.getInvoice(invoiceId)

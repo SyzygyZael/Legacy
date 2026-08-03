@@ -27,8 +27,10 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Money
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
@@ -46,6 +48,7 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -65,7 +68,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
-import com.kevinnesbitt.legacysecurefreelancercrm.util.DropdownSettingsRow
 import com.kevinnesbitt.legacysecurefreelancercrm.util.TextDropDown
 import com.kevinnesbitt.legacysecurefreelancercrm.util.convertMillisToDate
 import com.kevinnesbitt.legacysecurefreelancercrm.util.getCurrencyName
@@ -77,7 +79,9 @@ import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.util.Locale
+import androidx.compose.ui.platform.LocalLocale
+import com.kevinnesbitt.legacysecurefreelancercrm.util.DialogBox
+import com.kevinnesbitt.legacysecurefreelancercrm.variables.InvoiceStatus
 
 @Composable
 fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
@@ -93,13 +97,17 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
     val currencySymbol = getCurrencySymbol(clientCurrency)
     val currencyDisplayName = getCurrencyName(clientCurrency)
 
+    val totalEarnings = clientProjects.flatMap { project -> project.invoices }
+        .filter { invoice -> invoice.status == InvoiceStatus.PAID.name }
+        .sumOf { paidInvoice -> paidInvoice.amount }
+
     val clients = viewModel.clientState.collectAsStateWithLifecycle().value
     val activeProjects = clients.flatMap { client ->
         client.projects.filter { it.status == ProjectStatus.ACTIVE.name }
     }
 
     val currentDateObj = LocalDate.now()
-    val formatter = DateTimeFormatter.ofPattern(settings.dateFormat, Locale.getDefault())
+    val formatter = DateTimeFormatter.ofPattern(settings.dateFormat, LocalLocale.current.platformLocale)
     val currentDateStr = formatter.format(currentDateObj)
 
     clientProjects.forEach { project ->
@@ -140,6 +148,8 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
 
     var showEditClientDialog by remember { mutableStateOf(false) }
 
+    var tempProjectId by remember { mutableIntStateOf(0) }
+
     var tempNameText by remember { mutableStateOf("") }
     var tempCompanyText by remember { mutableStateOf("") }
     var tempEmailText by remember { mutableStateOf("") }
@@ -150,6 +160,7 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
     var expandBillingTypeChoice by remember { mutableStateOf(false) }
     var isAddingProject by remember { mutableStateOf(false) }
     var expandProjectStatusOptions by remember { mutableStateOf<Int?>(null) }
+    var showDeletionWarning by remember { mutableStateOf(false) }
 
     var tempProjectTitle by remember { mutableStateOf("") }
     var tempProjectDescription by remember { mutableStateOf("") }
@@ -365,7 +376,7 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                             horizontalArrangement = Arrangement.Center
                         ) {
                             Text(
-                                text = "${clientProjects.size}",
+                                text = "${currencySymbol}$totalEarnings",
                                 fontWeight = Bold,
                                 fontSize = valueTextSize,
                                 color = Color.Black,
@@ -569,6 +580,15 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                                     text = { Text("Move") },
                                     onClick = {
                                         isReordering = true
+                                        expandProjectOptions = null
+                                    }
+                                )
+
+                                DropdownMenuItem(
+                                    text = { Text("Delete") },
+                                    onClick = {
+                                        tempProjectId = project.id
+                                        showDeletionWarning = true
                                         expandProjectOptions = null
                                     }
                                 )
@@ -1194,6 +1214,64 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                 state = datePickerState,
                 showModeToggle = false
             )
+        }
+    }
+
+    if (showDeletionWarning) {
+        DialogBox(
+            iconImageVector = Icons.Default.Warning,
+            title = "Delete?",
+            description = "You are about to delete a project. This is irreversible and will change the metrics you see on your dashboards.",
+            onDismissRequest = { showDeletionWarning = false },
+            buttonRow = {
+                Button(
+                    onClick = { showDeletionWarning = false },
+                    colors = ButtonDefaults.buttonColors(
+                        contentColor = Color.Black,
+                        containerColor = Color.LightGray
+                    )
+                ) {
+                    Text(
+                        text = "Cancel",
+                        fontSize = 14.sp,
+                        fontWeight = Bold,
+                        color = Color.Black
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        val thisProject = clientProjects.find { project -> project.id == tempProjectId }
+                        val thisProjectId = thisProject?.id?: 0
+                        // val theseTasks = thisProject?.tasks?: emptyList()
+                        // val theseTimeLogs = thisProject?.timeLogs?: emptyList()
+                        // val theseInvoices = thisProject?.invoices?: emptyList()
+
+                        viewModel.deleteTasksUnderProject(thisProjectId)
+                        viewModel.deleteTimeLogsUnderProject(thisProjectId)
+                        viewModel.deleteInvoicesUnderProject(thisProjectId)
+
+                        viewModel.deleteProject(thisProjectId)
+
+                        tempProjectId = 0
+
+                        showDeletionWarning = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        contentColor = Color.Black,
+                        containerColor = Color.Cyan
+                    )
+                ) {
+                    Text(
+                        text = "Delete",
+                        fontSize = 14.sp,
+                        fontWeight = Bold,
+                        color = Color.Black
+                    )
+                }
+            }
+        ) {
+
         }
     }
 }

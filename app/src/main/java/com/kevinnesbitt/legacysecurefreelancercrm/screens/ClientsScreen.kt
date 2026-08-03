@@ -24,8 +24,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -41,6 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -60,6 +63,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
+import com.kevinnesbitt.legacysecurefreelancercrm.util.DialogBox
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.ClientStatus
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.SupportedCurrency
 import sh.calvin.reorderable.ReorderableItem
@@ -79,6 +83,8 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
         }
     }
 
+    var tempClientId by remember { mutableIntStateOf(0) }
+
     var tempNameText by remember { mutableStateOf("") }
     var tempCompanyText by remember { mutableStateOf("") }
     var tempEmailText by remember { mutableStateOf("") }
@@ -90,6 +96,7 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
     var expandClientOptions by remember { mutableStateOf<Int?>(null) }
     var expandClientScreenMenu by remember { mutableStateOf(false) }
     var showArchived by remember { mutableStateOf(false) }
+    var showDeletionWarning by remember { mutableStateOf(false) }
 
     LaunchedEffect(clientStates) {
         localClientStates = clientStates
@@ -263,13 +270,7 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                                     onDismissRequest = { expandClientOptions = null }
                                 ) {
                                     DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                text = "Archive",
-                                                fontSize = 15.sp,
-                                                fontWeight = Bold
-                                            )
-                                        },
+                                        text = { Text("Archive") },
                                         onClick = {
                                             viewModel.updateClientStatus(
                                                 ClientStatus.ARCHIVED.name,
@@ -281,15 +282,18 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                                     )
 
                                     DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                text = "Move",
-                                                fontSize = 15.sp,
-                                                fontWeight = Bold
-                                            )
-                                        },
+                                        text = { Text(text = "Move") },
                                         onClick = {
                                             isReordering = true
+                                            expandClientOptions = null
+                                        }
+                                    )
+
+                                    DropdownMenuItem(
+                                        text = { Text("Delete") },
+                                        onClick = {
+                                            tempClientId = client.id
+                                            showDeletionWarning = true
                                             expandClientOptions = null
                                         }
                                     )
@@ -367,6 +371,15 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                                                 client.id
                                             )
 
+                                            expandClientOptions = null
+                                        }
+                                    )
+
+                                    DropdownMenuItem(
+                                        text = { Text("Delete") },
+                                        onClick = {
+                                            tempClientId = client.id
+                                            showDeletionWarning = true
                                             expandClientOptions = null
                                         }
                                     )
@@ -655,6 +668,67 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                     }
                 }
             }
+        }
+    }
+
+    if (showDeletionWarning) {
+        DialogBox(
+            iconImageVector = Icons.Default.Warning,
+            title = "Delete?",
+            description = "You are about to delete a client. This is irreversible and will change the metrics you see on your dashboards.",
+            onDismissRequest = { showDeletionWarning = false },
+            buttonRow = {
+                Button(
+                    onClick = { showDeletionWarning = false },
+                    colors = ButtonDefaults.buttonColors(
+                        contentColor = Color.Black,
+                        containerColor = Color.LightGray
+                    )
+                ) {
+                    Text(
+                        text = "Cancel",
+                        fontSize = 14.sp,
+                        fontWeight = Bold,
+                        color = Color.Black
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        // ("Invoice Id Comparison", "invoice.id: ${invoice.id}, tempInvoiceId: $tempInvoiceId")
+                        val thisClient = clientStates.find { client -> client.id == tempClientId }
+                        val theseProjects = thisClient?.projects?: emptyList()
+                        // val theseTasks = theseProjects.flatMap { project -> project.tasks }
+                        // val theseTimeLogs = theseProjects.flatMap { project -> project.timeLogs }
+                        // val theseInvoices = theseProjects.flatMap { project -> project.invoices }
+
+                        theseProjects.forEach { project ->
+                            viewModel.deleteTasksUnderProject(project.id)
+                            viewModel.deleteTimeLogsUnderProject(project.id)
+                            viewModel.deleteInvoicesUnderProject(project.id)
+                        }
+
+                        viewModel.deleteProjectsUnderClient(tempClientId)
+                        viewModel.deleteClient(tempClientId)
+
+                        tempClientId = 0
+                        showDeletionWarning = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        contentColor = Color.Black,
+                        containerColor = Color.Cyan
+                    )
+                ) {
+                    Text(
+                        text = "Delete",
+                        fontSize = 14.sp,
+                        fontWeight = Bold,
+                        color = Color.Black
+                    )
+                }
+            }
+        ) {
+
         }
     }
 }

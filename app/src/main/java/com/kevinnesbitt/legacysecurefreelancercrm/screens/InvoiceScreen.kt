@@ -164,6 +164,7 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
     var showTasksDialog by remember { mutableStateOf(false) }
     var showTimeLogsDialog by remember { mutableStateOf(false) }
     var showPriceDialog by remember { mutableStateOf(false) }
+    var showDeletionWarning by remember { mutableStateOf(false) }
 
     val invoiceItems = items.filter { it.invoiceId == tempInvoiceId }
 
@@ -419,9 +420,8 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                         DropdownMenuItem(
                             text = { Text("Delete") },
                             onClick = {
-                                // ("Invoice Id Comparison", "invoice.id: ${invoice.id}, tempInvoiceId: $tempInvoiceId")
-
-                                viewModel.deleteInvoice(invoice.id)
+                                tempInvoiceId = invoice.id
+                                showDeletionWarning = true
                                 expandInvoiceOptions = null
                             }
                         )
@@ -1694,6 +1694,54 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
                     }
                 }
             }
+        }
+    }
+
+    if (showDeletionWarning) {
+        DialogBox(
+            iconImageVector = Icons.Default.Warning,
+            title = "Delete?",
+            description = "You are about to delete an invoice. This is irreversible and will change the metrics you see on your dashboards.",
+            onDismissRequest = { showDeletionWarning = false },
+            buttonRow = {
+                Button(
+                    onClick = { showDeletionWarning = false },
+                    colors = ButtonDefaults.buttonColors(
+                        contentColor = Color.Black,
+                        containerColor = Color.LightGray
+                    )
+                ) {
+                    Text(
+                        text = "Cancel",
+                        fontSize = 14.sp,
+                        fontWeight = Bold,
+                        color = Color.Black
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        // ("Invoice Id Comparison", "invoice.id: ${invoice.id}, tempInvoiceId: $tempInvoiceId")
+                        viewModel.deleteInvoice(tempInvoiceId)
+                        tempInvoiceId = 0
+
+                        showDeletionWarning = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        contentColor = Color.Black,
+                        containerColor = Color.Cyan
+                    )
+                ) {
+                    Text(
+                        text = "Delete",
+                        fontSize = 14.sp,
+                        fontWeight = Bold,
+                        color = Color.Black
+                    )
+                }
+            }
+        ) {
+
         }
     }
 }

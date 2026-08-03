@@ -1,12 +1,51 @@
-# Add project specific R8 rules here.
-# AGP will combine all keep rule files in src/main/keepRules to pass to R8
-#
-# For more details, see
-#   https://d.android.com/r/tools/r8/keep-rules
+# ==============================================================================
+# 1. DATABASE & ROOM DATA LAYER
+# ==============================================================================
+# Keep all Room Entities, DAOs, and Database classes in your database package
+-keep class com.kevinnesbitt.legacysecurefreelancercrm.database.** { *; }
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Keep Room generated implementations
+-keep class * extends androidx.room.RoomDatabase
+-dontwarn androidx.room.paging.**
+
+# ==============================================================================
+# 2. WORKMANAGER (DueDateCheckWorker)
+# ==============================================================================
+# WorkManager uses reflection to instantiate worker classes dynamically at runtime
+-keep class com.kevinnesbitt.legacysecurefreelancercrm.util.DueDateCheckWorker {
+    public <init>(android.content.Context, androidx.work.WorkerParameters);
+}
+
+# Keep all ListenableWorker subclasses across the project as a safety net
+-keep class * extends androidx.work.ListenableWorker {
+    public <init>(android.content.Context, androidx.work.WorkerParameters);
+}
+
+# ==============================================================================
+# 3. ENUMS & CONSTANTS (variables package)
+# ==============================================================================
+# Keep enums (BillingType, ClientStatus, InvoiceStatus, ProjectStatus)
+# so Room TypeConverters and String parsing won't break
+-keepclassmembers enum com.kevinnesbitt.legacysecurefreelancercrm.variables.** {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
+
+# ==============================================================================
+# 4. VIEW MODELS & ARCHITECTURE
+# ==============================================================================
+# Ensure ViewModel constructors are preserved for ViewModelProvider/Hilt
+-keep class * extends androidx.lifecycle.ViewModel {
+    public <init>(...);
+}
+
+# ==============================================================================
+# 5. JETPACK COMPOSE & SCREENS
+# ==============================================================================
+# Prevent R8 from stripping state holder classes used in UI screens
+-keep class com.kevinnesbitt.legacysecurefreelancercrm.screens.** { *; }
+
+# Keep Compose runtime annotations
+-keepclassmembers class * {
+    @androidx.compose.runtime.Composable <methods>;
+}

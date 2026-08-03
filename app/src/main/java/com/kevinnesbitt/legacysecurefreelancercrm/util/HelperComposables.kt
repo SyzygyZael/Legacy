@@ -1,8 +1,6 @@
 package com.kevinnesbitt.legacysecurefreelancercrm.util
 
 import android.annotation.SuppressLint
-import android.widget.Switch
-import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -84,7 +82,6 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.unit.Density
 
 @Composable
 fun DialogBoxSkeleton(onDismissRequest: () -> Unit, width: Dp, height: Dp, content: @Composable (() -> Unit)) {
@@ -123,7 +120,7 @@ fun DialogBox(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(8.dp),
+                    .padding(12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceEvenly
             ) {
@@ -149,7 +146,8 @@ fun DialogBox(
                     Text(
                         text = description,
                         fontSize = 17.sp,
-                        color = Color.Gray
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center
                     )
                 }
 
@@ -169,7 +167,7 @@ fun DialogBox(
 fun TimerText(timeLog: HomeViewModel.TimeLogData?, settings: SettingsEntity) {
     val longStartTime = timeLog?.startTime
 
-    val startTime = LocalTime.ofNanoOfDay(longStartTime?: 0)
+    val startTime = LocalTime.ofNanoOfDay(longStartTime ?: 0)
     var timeRightNow by remember { mutableStateOf(LocalTime.now()) }
 
     // val longPausedStartTime = timeLog?.pauseStartTime?: timeRightNow.toNanoOfDay()
@@ -181,20 +179,25 @@ fun TimerText(timeLog: HomeViewModel.TimeLogData?, settings: SettingsEntity) {
     // val correctedCurrentTime = LocalTime.ofNanoOfDay(longCorrectedCurrentTime)
 
     // 2. Calculate the duration dynamically based on the living state variable
-    val timerTime = Duration.between(startTime, timeRightNow)
+    val rawDuration = Duration.between(startTime, timeRightNow)
+    val timerTime = if (rawDuration.isNegative) Duration.ZERO else rawDuration
 
     // 3. Keep your ticking engine running every second
     LaunchedEffect(Unit) {
         while (true) {
             delay(1000.milliseconds)
-            // 4. ✅ FIX: Grab a fresh snapshot of the clock every second to trigger a screen refresh
             timeRightNow = LocalTime.now()
         }
     }
 
     Text(
         text = if (settings.isTiming && timeLog != null) {
-            "${timerTime.toHours()}:${String.format(LocalLocale.current.platformLocale, "%02d", timerTime.toMinutes() % 60)}:${String.format(LocalLocale.current.platformLocale, "%02d", timerTime.seconds % 60)}"
+            val hours = timerTime.toHours()
+            val minutes = timerTime.toMinutes() % 60
+            val seconds = timerTime.seconds % 60
+            val locale = LocalLocale.current.platformLocale
+
+            String.format(locale, "%d:%02d:%02d", hours, minutes, seconds)
         } else {
             "0:00:00"
         },
@@ -764,7 +767,7 @@ fun PersistingToastButton(
                         onClick = onClick,
                         colors = ButtonDefaults.buttonColors(
                             contentColor = Color.White,
-                            containerColor = Color.Green
+                            containerColor = Color(0xFF228B22L)
                         ),
                         shape = RoundedCornerShape(7.dp),
                         modifier = Modifier.padding(start = 30.dp)

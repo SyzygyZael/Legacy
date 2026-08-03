@@ -17,9 +17,15 @@ android {
         minSdk = 31
         targetSdk = 37
         versionCode = 1
-        versionName = "1.0"
+        versionName = "legacy_1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        getByName("debug") {
+            // Android uses defaults here automatically
+        }
     }
 
     buildTypes {
@@ -27,6 +33,15 @@ android {
             optimization {
                 enable = false
             }
+
+            isMinifyEnabled = true
+            isShrinkResources = true
+
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt")
+            )
+
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -35,6 +50,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

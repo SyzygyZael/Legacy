@@ -305,6 +305,24 @@ interface AppDao {
     suspend fun updateLogoPath(path: String)
 
     // DELETE QUERIES
+    @Query("DELETE FROM clients WHERE id = :clientId")
+    suspend fun deleteClient(clientId: Int)
+
+    @Query("DELETE FROM projects WHERE id = :projectId")
+    suspend fun deleteProject(projectId: Int)
+
+    @Query("DELETE FROM projects WHERE clientId = :clientId")
+    suspend fun deleteProjectsUnderClient(clientId: Int)
+
+    @Query("DELETE FROM tasks WHERE projectId = :projectId")
+    suspend fun deleteTasksUnderProject(projectId: Int)
+
+    @Query("DELETE FROM time_logs WHERE projectId = :projectId")
+    suspend fun deleteTimeLogsUnderProject(projectId: Int)
+
+    @Query("DELETE FROM invoices WHERE projectId = :projectId")
+    suspend fun deleteInvoicesUnderProject(projectId: Int)
+
     @Query("DELETE FROM tasks WHERE id = :taskId")
     suspend fun deleteTask(taskId: Int)
 
@@ -388,7 +406,7 @@ interface AppDao {
         TaskReminderEntity::class,
         InvoiceReminderEntity::class
                          ],
-        version = 40
+        version = 41
     )
     abstract class AppDatabase : RoomDatabase() {
         abstract fun appDao(): AppDao

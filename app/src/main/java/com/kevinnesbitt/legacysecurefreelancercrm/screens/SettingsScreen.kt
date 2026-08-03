@@ -365,27 +365,27 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
             }
 
             // Test Notifications
-            SettingsRow(
-                title = "Test Notifications"
-            ) {
-                Button(
-                    onClick = {
-                        val testRequest = OneTimeWorkRequestBuilder<DueDateCheckWorker>().build()
-                        WorkManager.getInstance(context).enqueue(testRequest)
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        contentColor = Color.Black,
-                        containerColor = Color.White
-                    )
-                ) {
-                    Text(
-                        text = "Test",
-                        fontWeight = Bold,
-                        fontSize = 18.sp,
-                        color = Color.Black
-                    )
-                }
-            }
+            // SettingsRow(
+            //     title = "Test Notifications"
+            // ) {
+            //     Button(
+            //         onClick = {
+            //             val testRequest = OneTimeWorkRequestBuilder<DueDateCheckWorker>().build()
+            //             WorkManager.getInstance(context).enqueue(testRequest)
+            //         },
+            //         colors = ButtonDefaults.buttonColors(
+            //             contentColor = Color.Black,
+            //             containerColor = Color.White
+            //         )
+            //     ) {
+            //         Text(
+            //             text = "Test",
+            //             fontWeight = Bold,
+            //             fontSize = 18.sp,
+            //             color = Color.Black
+            //         )
+            //     }
+            // }
         }
 
         PersistingToastButton(
