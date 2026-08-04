@@ -16,8 +16,8 @@ android {
         applicationId = "com.kevinnesbitt.legacysecurefreelancercrm"
         minSdk = 31
         targetSdk = 37
-        versionCode = 3
-        versionName = "legacy_1.2"
+        versionCode = 4
+        versionName = "legacy_1.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
