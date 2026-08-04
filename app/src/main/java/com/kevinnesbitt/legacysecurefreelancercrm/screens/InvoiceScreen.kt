@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -59,10 +58,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight.Companion.Bold
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -70,7 +67,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
 import com.kevinnesbitt.legacysecurefreelancercrm.util.DialogBox
 import com.kevinnesbitt.legacysecurefreelancercrm.util.DialogBoxSkeleton
@@ -87,7 +83,7 @@ import androidx.compose.ui.platform.LocalLocale
 import com.kevinnesbitt.legacysecurefreelancercrm.util.loadBitmapFromPath
 
 @Composable
-fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
+fun InvoiceScreen(projectId: Int, clientId: Int, viewModel: HomeViewModel) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -176,310 +172,220 @@ fun InvoiceScreen(projectName: String, projectId: Int, clientId: Int, viewModel:
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(innerPadding)
-            .background(color = Color(0xFFF2F2F2L)),
-        horizontalAlignment = Alignment.CenterHorizontally
+    // Begin making invoice rows
+    LazyColumn(
+        state = lazyListState
     ) {
-        Card(
-            elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
-            shape = RectangleShape
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(color = Color.White)
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.Start,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "$projectName Invoices",
-                    fontSize = 25.sp,
-                    fontWeight = Bold,
-                    fontFamily = FontFamily.SansSerif,
-                    color = Color.Black
+        items(localInvoices, key = { invoice -> invoice.id }) { invoice ->
+            android.util.Log.d("Invoice drawing", "invoice: $invoice")
+
+            Card(
+                elevation = CardDefaults.elevatedCardElevation(5.dp ,5.dp,5.dp,5.dp,5.dp,5.dp),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.padding(8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.White
                 )
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(color = Color.White),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
             ) {
-                Button(
-                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/overview") },
-                    shape = RectangleShape,
-                    colors = ButtonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Gray,
-                        disabledContainerColor = Color.White,
-                        disabledContentColor = Color.Gray
-                    )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(60.dp)
+                        .padding(8.dp)
+                        .background(color = Color.White)
+                        .combinedClickable(
+                            onClick = { },
+                            onLongClick = {
+                                expandInvoiceOptions = invoice.id
+                            }
+                        ),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Overview")
+                    Column {
+                        Text(
+                            text = invoice.issueDate,
+                            fontSize = 22.sp,
+                            fontWeight = Bold,
+                            color = Color.Black
+                        )
+
+                        Text(
+                            text = "${currencySymbol}${invoice.amount}",
+                            color = Color.Gray,
+                            fontSize = 17.sp
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.clickable(
+                            onClick = {
+                                expandInvoiceStatusOptions = invoice.id
+                            }
+                        )
+                    ) {
+                        DropdownMenu(
+                            expanded = expandInvoiceStatusOptions == invoice.id,
+                            onDismissRequest = { expandInvoiceStatusOptions = null }
+                        ) {
+                            InvoiceStatus.entries.forEach { status ->
+                                if (invoice.status != status.name) {
+                                    DropdownMenuItem(
+                                        text = { Text(status.name) },
+                                        onClick = {
+                                            if (status.name == InvoiceStatus.PAID.name) {
+                                                viewModel.updateInvoicePaidDate(invoice.id, currentDateStr)
+                                            }
+
+                                            viewModel.updateInvoiceStatus(invoice.id, status.name)
+                                            expandInvoiceStatusOptions = null
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        val rotationAngle by animateFloatAsState(
+                            targetValue = if (expandInvoiceStatusOptions == invoice.id) -90f else 0f,
+                            label = "IconRotationAnimation"
+                        )
+
+                        Text(
+                            text = invoice.status,
+                            color = when(invoice.status) {
+                                InvoiceStatus.DRAFT.name -> Color.Gray
+                                InvoiceStatus.SENT.name -> Color(0xFFFF7518L)
+                                InvoiceStatus.PAID.name -> Color.Green
+                                else -> Color.Red
+                            },
+                            fontSize = 20.sp
+                        )
+
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowLeft,
+                            contentDescription = "Status Dropdown",
+                            tint = Color.Black,
+                            modifier = Modifier.rotate(rotationAngle)
+                        )
+                    }
                 }
 
-                Button(
-                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/tasks") },
-                    shape = RectangleShape,
-                    colors = ButtonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Gray,
-                        disabledContainerColor = Color.White,
-                        disabledContentColor = Color.Gray
-                    )
+                DropdownMenu(
+                    expanded = expandInvoiceOptions == invoice.id,
+                    onDismissRequest = { expandInvoiceOptions = null }
                 ) {
-                    Text("Tasks")
-                }
+                    DropdownMenuItem(
+                        text = { Text("Generate PDF") },
+                        onClick = {
+                            val itemsForThisInvoice = items.filter { it.invoiceId == invoice.id }
 
-                Button(
-                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/logs") },
-                    shape = RectangleShape,
-                    colors = ButtonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Gray,
-                        disabledContainerColor = Color.White,
-                        disabledContentColor = Color.Gray
-                    )
-                ) {
-                    Text("Time Logs")
-                }
+                            val invoice = localInvoices.find { it.id == invoice.id }?: HomeViewModel.InvoiceData(
+                                0, 0, "", 0.0, "", "", "", "", "", "", "", "", "", "", "", "", 0.0, emptyList()
+                            )
 
-                Button(
-                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/invoices") },
-                    shape = RectangleShape,
-                    colors = ButtonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Gray,
-                        disabledContainerColor = Color.White,
-                        disabledContentColor = Color.Gray
+                            val logoBitmap = loadBitmapFromPath(settings.invoiceLogoPath)
+
+                            val uri = HomeViewModel.InvoicePdfGenerator.generate(
+                                context = context,
+                                invoice = invoice.copy(items = itemsForThisInvoice),
+                                currencySymbol = currencySymbol,
+                                signatureText = invoice.payTo,
+                                logoBitmap = logoBitmap
+                            )
+
+                            sharePdf(context, uri)
+
+                            expandInvoiceOptions = null
+                        }
                     )
-                ) {
-                    Text("Invoices")
+
+                    DropdownMenuItem(
+                        text = { Text("Edit") },
+                        onClick = {
+                            tempInvoiceId = invoice.id
+                            tempIssueDate = invoice.issueDate
+                            tempDueDate = invoice.dueDate
+                            tempClientName = invoice.issueTo
+                            tempClientCompanyORAddress = invoice.clientCompany
+                            tempClientEmail = invoice.clientEmail
+                            tempClientTelephone = invoice.clientTelephone
+                            tempSelfName = invoice.payTo
+                            tempSelfAddress = invoice.selfAddress
+                            tempSelfEmail = invoice.selfEmail
+                            tempSelfTelephone = invoice.selfTelephone
+                            tempTaxPercentage = invoice.taxPercentage
+                            tempStatus = invoice.status
+
+                            android.util.Log.d("Id on tap Edit", "tempInvoiceId: $tempInvoiceId")
+
+                            isAddingInvoice = true
+                            isEditingInvoice = true
+                            expandInvoiceOptions = null
+                        }
+                    )
+
+                    DropdownMenuItem(
+                        text = { Text("Delete") },
+                        onClick = {
+                            tempInvoiceId = invoice.id
+                            showDeletionWarning = true
+                            expandInvoiceOptions = null
+                        }
+                    )
                 }
             }
         }
 
-        // Begin making invoice rows
-        LazyColumn(
-            state = lazyListState
-        ) {
-            items(localInvoices, key = { invoice -> invoice.id }) { invoice ->
-                android.util.Log.d("Invoice drawing", "invoice: $invoice")
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    modifier = Modifier.size(40.dp),
+                    onClick = {
+                        coroutineScope.launch {
+                            val newInvoiceId = viewModel.createInvoice(
+                                projectId = projectId,
+                                invoiceNumber = "",
+                                issueDate = tempIssueDate,
+                                dueDate = tempDueDate,
+                                issueTo = tempClientName,
+                                clientCompany = tempClientCompanyORAddress,
+                                clientEmail = tempClientEmail,
+                                clientTelephone = tempClientTelephone,
+                                payTo = tempSelfName,
+                                selfAddress = tempSelfAddress,
+                                selfEmail = tempSelfEmail,
+                                selfTelephone = tempSelfTelephone,
+                                taxPercentage = tempTaxPercentage,
+                                status = InvoiceStatus.DRAFT.name
+                            ).toInt()
 
-                Card(
-                    elevation = CardDefaults.elevatedCardElevation(5.dp ,5.dp,5.dp,5.dp,5.dp,5.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.padding(8.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color.White
+                            tempInvoiceId = newInvoiceId
+
+                            android.util.Log.d("Id after creation", "tempInvoiceId: $tempInvoiceId")
+
+                            isAddingInvoice = true
+                        }
+                    },
+                    colors = IconButtonColors(
+                        containerColor = Color.Blue,
+                        contentColor = Color.White,
+                        disabledContentColor = Color.White,
+                        disabledContainerColor = Color.Blue
+                    ),
+                    shape = CircleShape
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add Invoice",
+                        modifier = Modifier.size(23.dp),
+                        tint = Color.White
                     )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(60.dp)
-                            .padding(8.dp)
-                            .background(color = Color.White)
-                            .combinedClickable(
-                                onClick = { },
-                                onLongClick = {
-                                    expandInvoiceOptions = invoice.id
-                                }
-                            ),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = invoice.issueDate,
-                                fontSize = 22.sp,
-                                fontWeight = Bold,
-                                color = Color.Black
-                            )
-
-                            Text(
-                                text = "${currencySymbol}${invoice.amount}",
-                                color = Color.Gray,
-                                fontSize = 17.sp
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier.clickable(
-                                onClick = {
-                                    expandInvoiceStatusOptions = invoice.id
-                                }
-                            )
-                        ) {
-                            DropdownMenu(
-                                expanded = expandInvoiceStatusOptions == invoice.id,
-                                onDismissRequest = { expandInvoiceStatusOptions = null }
-                            ) {
-                                InvoiceStatus.entries.forEach { status ->
-                                    if (invoice.status != status.name) {
-                                        DropdownMenuItem(
-                                            text = { Text(status.name) },
-                                            onClick = {
-                                                if (status.name == InvoiceStatus.PAID.name) {
-                                                    viewModel.updateInvoicePaidDate(invoice.id, currentDateStr)
-                                                }
-
-                                                viewModel.updateInvoiceStatus(invoice.id, status.name)
-                                                expandInvoiceStatusOptions = null
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-
-                            val rotationAngle by animateFloatAsState(
-                                targetValue = if (expandInvoiceStatusOptions == invoice.id) -90f else 0f,
-                                label = "IconRotationAnimation"
-                            )
-
-                            Text(
-                                text = invoice.status,
-                                color = when(invoice.status) {
-                                    InvoiceStatus.DRAFT.name -> Color.Gray
-                                    InvoiceStatus.SENT.name -> Color(0xFFFF7518L)
-                                    InvoiceStatus.PAID.name -> Color.Green
-                                    else -> Color.Red
-                                },
-                                fontSize = 20.sp
-                            )
-
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowLeft,
-                                contentDescription = "Status Dropdown",
-                                tint = Color.Black,
-                                modifier = Modifier.rotate(rotationAngle)
-                            )
-                        }
-                    }
-
-                    DropdownMenu(
-                        expanded = expandInvoiceOptions == invoice.id,
-                        onDismissRequest = { expandInvoiceOptions = null }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Generate PDF") },
-                            onClick = {
-                                val itemsForThisInvoice = items.filter { it.invoiceId == invoice.id }
-
-                                val invoice = localInvoices.find { it.id == invoice.id }?: HomeViewModel.InvoiceData(
-                                    0, 0, "", 0.0, "", "", "", "", "", "", "", "", "", "", "", "", 0.0, emptyList()
-                                )
-
-                                val logoBitmap = loadBitmapFromPath(settings.invoiceLogoPath)
-
-                                val uri = HomeViewModel.InvoicePdfGenerator.generate(
-                                    context = context,
-                                    invoice = invoice.copy(items = itemsForThisInvoice),
-                                    currencySymbol = currencySymbol,
-                                    signatureText = invoice.payTo,
-                                    logoBitmap = logoBitmap
-                                )
-
-                                sharePdf(context, uri)
-
-                                expandInvoiceOptions = null
-                            }
-                        )
-
-                        DropdownMenuItem(
-                            text = { Text("Edit") },
-                            onClick = {
-                                tempInvoiceId = invoice.id
-                                tempIssueDate = invoice.issueDate
-                                tempDueDate = invoice.dueDate
-                                tempClientName = invoice.issueTo
-                                tempClientCompanyORAddress = invoice.clientCompany
-                                tempClientEmail = invoice.clientEmail
-                                tempClientTelephone = invoice.clientTelephone
-                                tempSelfName = invoice.payTo
-                                tempSelfAddress = invoice.selfAddress
-                                tempSelfEmail = invoice.selfEmail
-                                tempSelfTelephone = invoice.selfTelephone
-                                tempTaxPercentage = invoice.taxPercentage
-                                tempStatus = invoice.status
-
-                                android.util.Log.d("Id on tap Edit", "tempInvoiceId: $tempInvoiceId")
-
-                                isAddingInvoice = true
-                                isEditingInvoice = true
-                                expandInvoiceOptions = null
-                            }
-                        )
-
-                        DropdownMenuItem(
-                            text = { Text("Delete") },
-                            onClick = {
-                                tempInvoiceId = invoice.id
-                                showDeletionWarning = true
-                                expandInvoiceOptions = null
-                            }
-                        )
-                    }
-                }
-            }
-
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(10.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        modifier = Modifier.size(40.dp),
-                        onClick = {
-                            coroutineScope.launch {
-                                val newInvoiceId = viewModel.createInvoice(
-                                    projectId = projectId,
-                                    invoiceNumber = "",
-                                    issueDate = tempIssueDate,
-                                    dueDate = tempDueDate,
-                                    issueTo = tempClientName,
-                                    clientCompany = tempClientCompanyORAddress,
-                                    clientEmail = tempClientEmail,
-                                    clientTelephone = tempClientTelephone,
-                                    payTo = tempSelfName,
-                                    selfAddress = tempSelfAddress,
-                                    selfEmail = tempSelfEmail,
-                                    selfTelephone = tempSelfTelephone,
-                                    taxPercentage = tempTaxPercentage,
-                                    status = InvoiceStatus.DRAFT.name
-                                ).toInt()
-
-                                tempInvoiceId = newInvoiceId
-
-                                android.util.Log.d("Id after creation", "tempInvoiceId: $tempInvoiceId")
-
-                                isAddingInvoice = true
-                            }
-                        },
-                        colors = IconButtonColors(
-                            containerColor = Color.Blue,
-                            contentColor = Color.White,
-                            disabledContentColor = Color.White,
-                            disabledContainerColor = Color.Blue
-                        ),
-                        shape = CircleShape
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add Invoice",
-                            modifier = Modifier.size(23.dp),
-                            tint = Color.White
-                        )
-                    }
                 }
             }
         }

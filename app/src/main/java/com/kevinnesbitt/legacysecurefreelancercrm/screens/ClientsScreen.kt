@@ -71,7 +71,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Composable
 fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerPadding: PaddingValues) {
-    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    // val settings by viewModel.settings.collectAsStateWithLifecycle()
     val clientStates by viewModel.clientState.collectAsStateWithLifecycle()
 
     var localClientStates by remember(clientStates) { mutableStateOf(clientStates) }
@@ -213,7 +213,7 @@ fun ClientsScreen(viewModel: HomeViewModel, navController: NavController, innerP
                                     .fillMaxWidth()
                                     .padding(5.dp)
                                     .combinedClickable(
-                                        onClick = { navController.navigate("client/${client.id}/overview") },
+                                        onClick = { navController.navigate("client/${client.id}") },
                                         onLongClick = { expandClientOptions = client.id }
                                     ),
                                 elevation = CardDefaults.cardElevation(

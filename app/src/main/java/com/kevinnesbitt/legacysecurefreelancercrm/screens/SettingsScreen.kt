@@ -40,8 +40,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight.Companion.Bold
@@ -51,11 +49,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
 import com.kevinnesbitt.legacysecurefreelancercrm.util.DropdownSettingsRow
-import com.kevinnesbitt.legacysecurefreelancercrm.util.DueDateCheckWorker
 import com.kevinnesbitt.legacysecurefreelancercrm.util.NavigationSettingsRow
 import com.kevinnesbitt.legacysecurefreelancercrm.util.PersistingToastButton
 import com.kevinnesbitt.legacysecurefreelancercrm.util.SettingsRow
@@ -69,8 +64,8 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    val windowInfo = LocalWindowInfo.current
-    val screenWidth = windowInfo.containerDpSize.width
+    // val windowInfo = LocalWindowInfo.current
+    // val screenWidth = windowInfo.containerDpSize.width
     // val screenHeight = windowInfo.containerDpSize.height
 
     var logoUri by remember { mutableStateOf<Uri?>(null) }

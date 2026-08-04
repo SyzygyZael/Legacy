@@ -454,7 +454,7 @@ fun ClientOverviewScreen(clientId: Int, viewModel: HomeViewModel, innerPadding: 
                                 .padding(8.dp)
                                 .combinedClickable(
                                     onClick = {
-                                        navController.navigate("project/${project.title}/${project.id}/${clientId}/overview")
+                                        navController.navigate("project/${project.title}/${project.id}/${clientId}")
                                     },
                                     onLongClick = { expandProjectOptions = project.id }
                                 ),

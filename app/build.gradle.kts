@@ -16,8 +16,8 @@ android {
         applicationId = "com.kevinnesbitt.legacysecurefreelancercrm"
         minSdk = 31
         targetSdk = 37
-        versionCode = 1
-        versionName = "legacy_1.0"
+        versionCode = 3
+        versionName = "legacy_1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -73,7 +73,7 @@ dependencies {
     implementation("androidx.room:room-runtime:2.7.1")
     implementation("androidx.room:room-ktx:2.7.1")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
-    implementation("com.android.billingclient:billing:7.0.0")
+    implementation("com.android.billingclient:billing:9.1.0")
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava")

@@ -1,10 +1,8 @@
 package com.kevinnesbitt.legacysecurefreelancercrm.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,15 +15,12 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
@@ -52,14 +47,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight.Companion.Bold
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
 import com.kevinnesbitt.legacysecurefreelancercrm.util.DialogBoxSkeleton
 import com.kevinnesbitt.legacysecurefreelancercrm.util.convertMillisToDate
@@ -68,10 +60,11 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import java.util.Locale
+import androidx.compose.ui.platform.LocalLocale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel: HomeViewModel, innerPadding: PaddingValues, navController: NavController) {
+fun TimeLogsScreen(projectId: Int, clientId: Int, viewModel: HomeViewModel) {
     val settings by viewModel.settings.collectAsState()
 
     val clientState = viewModel.clientState.collectAsStateWithLifecycle().value.find { clientId == it.id }
@@ -129,362 +122,248 @@ fun TimeLogsScreen(projectName: String, projectId: Int, clientId: Int, viewModel
     var showTimeDifferenceErrorDialog by remember { mutableStateOf(false) }
     var isEditingTimeLog by remember { mutableStateOf(false) }
 
-    Column(
+    Row(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(innerPadding)
-            .background(color = Color(0xFFF2F2F2L)),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .fillMaxWidth()
+            .height(40.dp),
+        horizontalArrangement = Arrangement.SpaceAround,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Card(
-            elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
-            shape = RectangleShape
-        ) {
+        Text(
+            text = "Start",
+            color = Color.Black,
+            textAlign = TextAlign.Center
+        )
+
+        Text(
+            text = "End",
+            color = Color.Black,
+            textAlign = TextAlign.Center
+        )
+
+        Text(
+            text = "Billable",
+            color = Color.Black,
+            textAlign = TextAlign.Center
+        )
+
+        Text(
+            text = "Date",
+            color = Color.Black,
+            textAlign = TextAlign.Center
+        )
+    }
+
+    HorizontalDivider(thickness = 1.dp, color = Color.Gray)
+
+    LazyColumn(state = lazyListState) {
+        items(localTimeLogs, key = { timeLog -> timeLog.id }) { timeLog ->
+            val formatter = DateTimeFormatter.ofPattern("hh:mm a", LocalLocale.current.platformLocale)
+            val startTimeObj = LocalTime.ofNanoOfDay(timeLog.startTime)
+            val endTimeObj = LocalTime.ofNanoOfDay(timeLog.endTime)
+
+            val startTimeStr = when {
+                settings.timeFormat == "12-Hour" -> {
+                    startTimeObj.format(formatter)
+                }
+                else -> {
+                    val startHour = startTimeObj.hour
+                    val startMinute = startTimeObj.minute
+
+                    "$startHour:$startMinute"
+                }
+            }
+
+            val endTimeStr = when {
+                settings.timeFormat == "12-Hour" -> {
+                    endTimeObj.format(formatter)
+                }
+                else -> {
+                    val endHour = endTimeObj.hour
+                    val endMinute = endTimeObj.minute
+
+                    "$endHour:$endMinute"
+                }
+            }
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(color = Color.White)
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .height(55.dp)
+                    .padding(vertical = 8.dp)
+                    .combinedClickable(
+                        onClick = { },
+                        onLongClick = {
+                            expandTaskOptions = timeLog.id
+                        }
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceAround
             ) {
                 Text(
-                    text = "$projectName Time Logs",
-                    fontSize = 25.sp,
-                    fontWeight = Bold,
-                    fontFamily = FontFamily.SansSerif,
-                    color = Color.Black
+                    text = startTimeStr,
+                    fontSize = 14.sp,
+                    color = Color.Gray,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(start = 10.dp)
+                )
+                DropdownMenu(
+                    expanded = expandTaskOptions == timeLog.id,
+                    onDismissRequest = { expandTaskOptions = null }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Delete") },
+                        onClick = {
+                            viewModel.deleteLog(timeLog.id)
+                            expandTaskOptions = null
+                        }
+                    )
+
+                    DropdownMenuItem(
+                        text = { Text("Edit") },
+                        onClick = {
+                            val localStartTime = LocalTime.ofNanoOfDay(timeLog.startTime)
+                            val localEndTime = LocalTime.ofNanoOfDay(timeLog.endTime)
+                            val formatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())
+
+                            val startTimeStr = when {
+                                settings.timeFormat == "12-Hour" -> {
+                                    localStartTime.format(formatter)
+                                }
+                                else -> {
+                                    val startHour = localStartTime.hour
+                                    val startMinute = localStartTime.minute
+
+                                    "$startHour:$startMinute"
+                                }
+                            }
+
+                            val endTimeStr = when {
+                                settings.timeFormat == "12-Hour" -> {
+                                    localEndTime.format(formatter)
+                                }
+                                else -> {
+                                    val endHour = localEndTime.hour
+                                    val endMinute = localEndTime.minute
+
+                                    "$endHour:$endMinute"
+                                }
+                            }
+
+                            startTimePickerState = TimePickerState(
+                                initialHour = localStartTime.hour,
+                                initialMinute = localStartTime.minute,
+                                is24Hour = when {
+                                    settings.timeFormat == "24-Hour" -> true
+                                    else -> false
+                                }
+                            )
+
+                            endTimePickerState = TimePickerState(
+                                initialHour = localEndTime.hour,
+                                initialMinute = localEndTime.minute,
+                                is24Hour = when {
+                                    settings.timeFormat == "24-Hour" -> true
+                                    else -> false
+                                }
+                            )
+
+                            tempLogId = timeLog.id
+                            selectedStartTimeText = startTimeStr
+                            selectedEndTimeText = endTimeStr
+                            tempSelectedDate = timeLog.date
+                            longSelectedStartTime = timeLog.startTime
+                            longSelectedEndTime = timeLog.endTime
+
+                            isEditingTimeLog = true
+                        }
+                    )
+
+                    DropdownMenuItem(
+                        text = { Text("Move") },
+                        onClick = {
+                            isReordering = true
+                            expandTaskOptions = null
+                        }
+                    )
+                }
+
+                Text(
+                    text = endTimeStr,
+                    fontSize = 14.sp,
+                    color = Color.Gray,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(end = 15.dp)
                 )
 
-                if (isReordering) {
-                    IconButton(
-                        modifier = Modifier.size(55.dp, 55.dp),
-                        onClick = {
-                            isReordering = false
-                            viewModel.updateTimeLogsOrder(localTimeLogs)
-                        },
-                        colors = IconButtonColors(
-                            containerColor = Color.White,
-                            contentColor = Color.Black,
-                            disabledContentColor = Color.Black,
-                            disabledContainerColor = Color.White
-                        ),
-                        shape = CircleShape
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = "Done Reordering",
-                            modifier = Modifier.size(23.dp),
-                            tint = Color.Black
-                        )
+                val endTime = LocalTime.ofNanoOfDay(timeLog.endTime)
+                val startTime = LocalTime.ofNanoOfDay(timeLog.startTime)
+                val totalTime = when {
+                    startTime.toNanoOfDay() < endTime.toNanoOfDay() -> {
+                        Duration.between(startTime, endTime).toHours()
+                    }
+                    else -> {
+                        Duration.between(startTime, endTime).toHours() + 23
                     }
                 }
+                Text(
+                    text = "${totalTime}H",
+                    fontSize = 14.sp,
+                    color = Color.Black,
+                    textAlign = TextAlign.Center
+                )
+
+                val year = timeLog.date.substring(0, 4)
+                val month = timeLog.date.substring(5, 7)
+                val day = timeLog.date.substring(8, 10)
+                Text(
+                    text = "$month/$day/$year",
+                    fontSize = 14.sp,
+                    color = Color.Gray,
+                    textAlign = TextAlign.Center
+                )
             }
 
+            if (isReordering) {
+                Text(
+                    text = "…\n…",
+                    fontSize = 25.sp,
+                    fontWeight = Bold,
+                    color = Color.Black,
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+
+        item {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(color = Color.White),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(10.dp),
+                horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Button(
-                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/overview") },
-                    shape = RectangleShape,
-                    colors = ButtonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Gray,
-                        disabledContainerColor = Color.White,
-                        disabledContentColor = Color.Gray
-                    )
+                IconButton(
+                    modifier = Modifier.size(40.dp),
+                    onClick = {
+                        isAddingTimeLog = true
+                    },
+                    colors = IconButtonColors(
+                        containerColor = Color.Blue,
+                        contentColor = Color.White,
+                        disabledContentColor = Color.White,
+                        disabledContainerColor = Color.Blue
+                    ),
+                    shape = CircleShape
                 ) {
-                    Text("Overview")
-                }
-
-                Button(
-                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/tasks") },
-                    shape = RectangleShape,
-                    colors = ButtonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Gray,
-                        disabledContainerColor = Color.White,
-                        disabledContentColor = Color.Gray
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add Client",
+                        modifier = Modifier.size(23.dp),
+                        tint = Color.White
                     )
-                ) {
-                    Text("Tasks")
-                }
-
-                Button(
-                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/logs") },
-                    shape = RectangleShape,
-                    colors = ButtonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Gray,
-                        disabledContainerColor = Color.White,
-                        disabledContentColor = Color.Gray
-                    )
-                ) {
-                    Text("Time Logs")
-                }
-
-                Button(
-                    onClick = { navController.navigate("project/${projectName}/${projectId}/${clientId}/invoices") },
-                    shape = RectangleShape,
-                    colors = ButtonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Gray,
-                        disabledContainerColor = Color.White,
-                        disabledContentColor = Color.Gray
-                    )
-                ) {
-                    Text("Invoices")
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(40.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Start",
-                color = Color.Black,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "End",
-                color = Color.Black,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "Billable",
-                color = Color.Black,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "Date",
-                color = Color.Black,
-                textAlign = TextAlign.Center
-            )
-        }
-
-        HorizontalDivider(thickness = 1.dp, color = Color.Gray)
-
-        LazyColumn(state = lazyListState) {
-            items(localTimeLogs, key = { timeLog -> timeLog.id }) { timeLog ->
-                val formatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())
-                val startTimeObj = LocalTime.ofNanoOfDay(timeLog.startTime)
-                val endTimeObj = LocalTime.ofNanoOfDay(timeLog.endTime)
-
-                val startTimeStr = when {
-                    settings.timeFormat == "12-Hour" -> {
-                        startTimeObj.format(formatter)
-                    }
-                    else -> {
-                        val startHour = startTimeObj.hour
-                        val startMinute = startTimeObj.minute
-
-                        "$startHour:$startMinute"
-                    }
-                }
-
-                val endTimeStr = when {
-                    settings.timeFormat == "12-Hour" -> {
-                        endTimeObj.format(formatter)
-                    }
-                    else -> {
-                        val endHour = endTimeObj.hour
-                        val endMinute = endTimeObj.minute
-
-                        "$endHour:$endMinute"
-                    }
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(55.dp)
-                        .padding(vertical = 8.dp)
-                        .combinedClickable(
-                            onClick = { },
-                            onLongClick = {
-                                expandTaskOptions = timeLog.id
-                            }
-                        ),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceAround
-                ) {
-                    Text(
-                        text = startTimeStr,
-                        fontSize = 14.sp,
-                        color = Color.Gray,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(start = 10.dp)
-                    )
-                    DropdownMenu(
-                        expanded = expandTaskOptions == timeLog.id,
-                        onDismissRequest = { expandTaskOptions = null }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Delete") },
-                            onClick = {
-                                viewModel.deleteLog(timeLog.id)
-                                expandTaskOptions = null
-                            }
-                        )
-
-                        DropdownMenuItem(
-                            text = { Text("Edit") },
-                            onClick = {
-                                val localStartTime = LocalTime.ofNanoOfDay(timeLog.startTime)
-                                val localEndTime = LocalTime.ofNanoOfDay(timeLog.endTime)
-                                val formatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())
-
-                                val startTimeStr = when {
-                                    settings.timeFormat == "12-Hour" -> {
-                                        localStartTime.format(formatter)
-                                    }
-                                    else -> {
-                                        val startHour = localStartTime.hour
-                                        val startMinute = localStartTime.minute
-
-                                        "$startHour:$startMinute"
-                                    }
-                                }
-
-                                val endTimeStr = when {
-                                    settings.timeFormat == "12-Hour" -> {
-                                        localEndTime.format(formatter)
-                                    }
-                                    else -> {
-                                        val endHour = localEndTime.hour
-                                        val endMinute = localEndTime.minute
-
-                                        "$endHour:$endMinute"
-                                    }
-                                }
-
-                                startTimePickerState = TimePickerState(
-                                    initialHour = localStartTime.hour,
-                                    initialMinute = localStartTime.minute,
-                                    is24Hour = when {
-                                        settings.timeFormat == "24-Hour" -> true
-                                        else -> false
-                                    }
-                                )
-
-                                endTimePickerState = TimePickerState(
-                                    initialHour = localEndTime.hour,
-                                    initialMinute = localEndTime.minute,
-                                    is24Hour = when {
-                                        settings.timeFormat == "24-Hour" -> true
-                                        else -> false
-                                    }
-                                )
-
-                                tempLogId = timeLog.id
-                                selectedStartTimeText = startTimeStr
-                                selectedEndTimeText = endTimeStr
-                                tempSelectedDate = timeLog.date
-                                longSelectedStartTime = timeLog.startTime
-                                longSelectedEndTime = timeLog.endTime
-
-                                isEditingTimeLog = true
-                            }
-                        )
-
-                        DropdownMenuItem(
-                            text = { Text("Move") },
-                            onClick = {
-                                isReordering = true
-                                expandTaskOptions = null
-                            }
-                        )
-                    }
-
-                    Text(
-                        text = endTimeStr,
-                        fontSize = 14.sp,
-                        color = Color.Gray,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(end = 15.dp)
-                    )
-
-                    val endTime = LocalTime.ofNanoOfDay(timeLog.endTime)
-                    val startTime = LocalTime.ofNanoOfDay(timeLog.startTime)
-                    val totalTime = when {
-                        startTime.toNanoOfDay() < endTime.toNanoOfDay() -> {
-                            Duration.between(startTime, endTime).toHours()
-                        }
-                        else -> {
-                            Duration.between(startTime, endTime).toHours() + 23
-                        }
-                    }
-                    Text(
-                        text = "${totalTime}H",
-                        fontSize = 14.sp,
-                        color = Color.Black,
-                        textAlign = TextAlign.Center
-                    )
-
-                    val year = timeLog.date.substring(0, 4)
-                    val month = timeLog.date.substring(5, 7)
-                    val day = timeLog.date.substring(8, 10)
-                    Text(
-                        text = "$month/$day/$year",
-                        fontSize = 14.sp,
-                        color = Color.Gray,
-                        textAlign = TextAlign.Center
-                    )
-                }
-
-                if (isReordering) {
-                    Text(
-                        text = "…\n…",
-                        fontSize = 25.sp,
-                        fontWeight = Bold,
-                        color = Color.Black,
-                        modifier = Modifier
-                            .fillMaxWidth(),
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(10.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        modifier = Modifier.size(40.dp),
-                        onClick = {
-                            isAddingTimeLog = true
-                        },
-                        colors = IconButtonColors(
-                            containerColor = Color.Blue,
-                            contentColor = Color.White,
-                            disabledContentColor = Color.White,
-                            disabledContainerColor = Color.Blue
-                        ),
-                        shape = CircleShape
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add Client",
-                            modifier = Modifier.size(23.dp),
-                            tint = Color.White
-                        )
-                    }
                 }
             }
         }
