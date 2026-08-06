@@ -254,7 +254,7 @@ fun NavigationSettingsRow(title: String, navigateTo: String, navController: NavC
         modifier = Modifier
             .fillMaxWidth()
             .background(color = Color.White)
-            .padding(horizontal = 8.dp)
+            .padding(end = 8.dp)
             .clickable(
                 onClick = {
                     navController.navigate(navigateTo)

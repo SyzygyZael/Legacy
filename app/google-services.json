@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "184878633293",
+    "project_id": "legacy----freelancer-crm",
+    "storage_bucket": "legacy----freelancer-crm.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:184878633293:android:09b6f1d7b0f3845dfa6704",
+        "android_client_info": {
+          "package_name": "com.kevinnesbitt.legacysecurefreelancercrm"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "184878633293-or4nl24j4ruvnp3nuhsjqlc2vdlvtluu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kevinnesbitt.legacysecurefreelancercrm",
+            "certificate_hash": "efb70451b277e67620430d97dec442f8ec7e5623"
+          }
+        },
+        {
+          "client_id": "184878633293-ega8at47m794rai5u49o1eq2a2tmknq6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBr_GhIRWnlsTHSCVrvXVxuoGzrkFSsN-4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "184878633293-ega8at47m794rai5u49o1eq2a2tmknq6.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -19,46 +19,46 @@ import kotlinx.coroutines.internal.synchronized
 
 @Entity(tableName = "clients")
 data class ClientDataEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int,
-    val name: String,
-    val company: String,
-    val email: String,
-    val telp: String,
-    val currency: String,
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val name: String = "",
+    val company: String = "",
+    val email: String = "",
+    val telp: String = "",
+    val currency: String = "",
     val status: String = ClientStatus.ACTIVE.name,
-    val orderIndex: Int
+    val orderIndex: Int = 0
 )
 
 @Entity(tableName = "projects")
 data class ProjectDataEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int,
-    val clientId: Int,
-    val title: String,
-    val description: String,
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val clientId: Int = 0,
+    val title: String = "",
+    val description: String = "",
     val status: String = ProjectStatus.PAUSED.name,
-    val deadLine: String,
-    val payRate: Double,
-    val billingType: String,
-    val budget: Double,
-    val orderIndex: Int,
+    val deadLine: String = "",
+    val payRate: Double = 0.0,
+    val billingType: String = "",
+    val budget: Double = 0.0,
+    val orderIndex: Int = 0,
     val notified: Boolean = false
 )
 
 @Entity(tableName = "tasks")
 data class TaskDataEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int,
-    val projectId: Int,
-    val description: String,
-    val isCompleted: Boolean,
-    val dueDate: String,
-    val orderIndex: Int,
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val projectId: Int = 0,
+    val description: String = "",
+    val isCompleted: Boolean = false,
+    val dueDate: String = "",
+    val orderIndex: Int = 0,
     val notified: Boolean = false
 )
 
 @Entity(tableName = "time_logs")
 data class TimeLogsEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int,
-    val projectId: Int,
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val projectId: Int = 0,
     val startTime: Long = 0L,
     val endTime: Long = 0L,
     // val pauseStartTime: Long = 0L,
@@ -66,57 +66,57 @@ data class TimeLogsEntity(
     // val totalPauseTime: Long = 0L,
     val isBilled: Boolean = false,
     val date: String = "--/--/----",
-    val orderIndex: Int
+    val orderIndex: Int = 0
 )
 
 @Entity(tableName = "invoices")
 data class InvoiceEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int,
-    val projectId: Int,
-    val invoiceNumber: String,
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val projectId: Int = 0,
+    val invoiceNumber: String = "",
     val amount: Double = 0.0,
-    val issueDate: String,
-    val dueDate: String,
+    val issueDate: String = "",
+    val dueDate: String = "",
     val paidDate: String = "--/--/----",
-    val issueTo: String,
-    val clientCompany: String,
-    val clientEmail: String,
-    val clientTelephone: String,
-    val payTo: String,
-    val selfAddress: String,
-    val selfEmail: String,
-    val selfTelephone: String,
+    val issueTo: String = "",
+    val clientCompany: String = "",
+    val clientEmail: String = "",
+    val clientTelephone: String = "",
+    val payTo: String = "",
+    val selfAddress: String = "",
+    val selfEmail: String = "",
+    val selfTelephone: String = "",
     val status: String = InvoiceStatus.DRAFT.name,
-    val taxPercentage: Double,
+    val taxPercentage: Double = 0.0,
     val notified: Boolean = false
 )
 
 @Entity(tableName = "invoice_item")
 data class ItemEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int,
-    val invoiceId: Int,
-    val name: String,
-    val price: Double,
-    val quantity: Int
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val invoiceId: Int = 0,
+    val name: String = "",
+    val price: Double = 0.0,
+    val quantity: Int = 0
 )
 
 @Entity(tableName = "project_reminders")
 data class ProjectReminderEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int,
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val numUnits: Int = 0,
     val unit: String = "Days"
 )
 
 @Entity(tableName = "task_reminders")
 data class TaskReminderEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int,
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val numUnits: Int = 0,
     val unit: String = "Days"
 )
 
 @Entity(tableName = "invoice_reminders")
 data class InvoiceReminderEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int,
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val numUnits: Int = 0,
     val unit: String = "Days"
 )
@@ -134,7 +134,8 @@ data class SettingsEntity(
     val selfTelephone: String = "",
     val preferredCurrency: String = "USD",
     val taxBracket: Double = 0.0,
-    val invoiceLogoPath: String = ""
+    val invoiceLogoPath: String = "",
+    val acceptedPrivacyPolicy: Boolean = false
 )
 
 @Dao
@@ -289,6 +290,12 @@ interface AppDao {
     @Query("UPDATE invoice_reminders SET numUnits = :numUnits, unit = :unit WHERE id = :reminderId")
     suspend fun updateInvoiceReminder(reminderId: Int, numUnits: Int, unit: String)
 
+    @Query("UPDATE settings SET selfName = :selfName, selfEmail = :selfEmail WHERE id = 1")
+    suspend fun updateUserName(selfName: String, selfEmail: String)
+
+    @Query("UPDATE settings SET acceptedPrivacyPolicy = :status WHERE id = 1")
+    suspend fun acceptPrivacyPolicy(status: Boolean)
+
     @Query("UPDATE settings SET timeFormat = :timeFormat, dateFormat = :dateFormat, selfName = :selfName, selfAddress = :selfAddress, selfEmail = :selfEmail, selfTelephone = :selfTelephone, preferredCurrency = :currency, taxBracket = :taxBracket WHERE id = 1")
     suspend fun updateSettings(
         timeFormat: String,
@@ -406,7 +413,7 @@ interface AppDao {
         TaskReminderEntity::class,
         InvoiceReminderEntity::class
                          ],
-        version = 41
+        version = 42
     )
     abstract class AppDatabase : RoomDatabase() {
         abstract fun appDao(): AppDao

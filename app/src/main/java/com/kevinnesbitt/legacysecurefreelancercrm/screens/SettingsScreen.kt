@@ -1,5 +1,6 @@
 package com.kevinnesbitt.legacysecurefreelancercrm.screens
 
+import android.R
 import android.graphics.Bitmap
 import android.net.Uri
 import android.widget.Toast
@@ -49,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.google.firebase.auth.FirebaseUser
 import com.kevinnesbitt.legacysecurefreelancercrm.database.HomeViewModel
 import com.kevinnesbitt.legacysecurefreelancercrm.util.DropdownSettingsRow
 import com.kevinnesbitt.legacysecurefreelancercrm.util.NavigationSettingsRow
@@ -59,7 +61,7 @@ import com.kevinnesbitt.legacysecurefreelancercrm.variables.SupportedCurrency
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, innerPadding: PaddingValues) {
+fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, innerPadding: PaddingValues, currentUser: FirebaseUser?) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -102,6 +104,7 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
 
     var isChoosingTimeFormat by remember { mutableStateOf(false) }
     var isChoosingDateFormat by remember { mutableStateOf(false) }
+    var isSyncing by remember { mutableStateOf(false) }
     var isChoosingCurrency by remember { mutableStateOf(false) }
 
     val changedSettings = when {
@@ -191,6 +194,21 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
                         )
                     }
                 }
+            }
+
+            // Account Name
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (currentUser != null) "Signed in as ${currentUser.email}" else "Not Signed In",
+                    fontSize = 18.sp,
+                    fontWeight = Bold,
+                    color = Color.DarkGray
+                )
             }
 
             // Profile
@@ -357,6 +375,64 @@ fun SettingsScreen(viewModel: HomeViewModel, navController: NavController, inner
                         color = Color.Black
                     )
                 }
+            }
+
+            Button(
+                onClick = {
+                    isSyncing = true
+                    viewModel.syncToCloud { success, message ->
+                        isSyncing = false
+                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    }
+                },
+                enabled = !isSyncing,
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent)
+            ) {
+                Text(
+                    text = "Backup",
+                    fontWeight = Bold,
+                    fontSize = 18.sp,
+                    color = Color.Red
+                )
+            }
+
+            Button(
+                onClick = {
+                    isSyncing = true
+                    viewModel.restoreFromCloud { success, message ->
+                        isSyncing = false
+                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent)
+            ) {
+                Text(
+                    text = "Restore",
+                    fontWeight = Bold,
+                    fontSize = 18.sp,
+                    color = Color.Red
+                )
+            }
+
+            Button(
+                onClick = {
+                    isSyncing = true
+                    viewModel.syncToCloud { success, message ->
+                        isSyncing = false
+                        // Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    }
+
+                    viewModel.signOutUser(context)
+                    // navController.navigate("auth")
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent)
+            ) {
+                Text(
+                    text = "Sign Out",
+                    fontWeight = Bold,
+                    fontSize = 18.sp,
+                    color = Color.Red
+                )
             }
 
             // Test Notifications

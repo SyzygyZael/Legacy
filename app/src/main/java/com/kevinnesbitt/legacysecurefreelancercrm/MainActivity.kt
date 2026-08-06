@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
             LegacySecureFreelancerCRMTheme {
                 val isSubscribed by billingHelper.isSubscribed.collectAsState()
                 // val isSubscribed = false
+                // val isSubscribed = true
 
                 // Inside your main Composable:
                 val permissionLauncher = rememberLauncherForActivityResult(
@@ -95,201 +96,283 @@ class MainActivity : ComponentActivity() {
                     factory = ViewModelProvider.AndroidViewModelFactory.getInstance(application)
                 )
 
+                val currentUser by viewModel.currentUser.collectAsState()
                 var currentScreen by remember { mutableStateOf("home") }
-
                 var padding by remember { mutableStateOf(8.dp) }
 
-                when(isSubscribed) {
-                    null -> {
-                        // Show a blank screen or loading spinner while checking Play Store
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
+                val initialStartDestination = remember {
+                    when {
+                        isSubscribed != true -> "subscription"
+                        currentUser == null -> "auth"
+                        else -> "home"
                     }
+                }
 
-                    true -> {
-                        Scaffold(
-                            modifier = Modifier.fillMaxSize(),
-                            topBar = {
-                                Row(
-                                    modifier = Modifier
-                                        .size(width = screenWidth, height = 55.dp)
-                                        .background(color = Color.White)
-                                ) {  }
-                            },
-                            bottomBar = {
-                                Card(
-                                    elevation = CardDefaults.cardElevation(5.dp, 5.dp, 5.dp, 5.dp, 5.dp, 5.dp),
-                                    shape = RectangleShape
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .size(width = screenWidth, height = 55.dp)
-                                            .background(color = Color.White)
-                                            .navigationBarsPadding(),
-                                        horizontalArrangement = Arrangement.SpaceEvenly
-                                    ) {
-                                        val verticalBrush = Brush.linearGradient(
-                                            colors = listOf(Color.Cyan, Color.White),
-                                            start = Offset(x = 0f, y = 0f), // Starts at top-left
-                                            end = Offset(x = 0f, y = Float.POSITIVE_INFINITY) // Ends at bottom-left
-                                        )
-                                        val offVerticalBrush = Brush.linearGradient(
-                                            colors = listOf(Color.White, Color.White),
-                                            start = Offset(x = 0f, y = 0f), // Starts at top-left
-                                            end = Offset(x = 0f, y = Float.POSITIVE_INFINITY) // Ends at bottom-left
-                                        )
+                LaunchedEffect(currentUser, isSubscribed) {
+                    val currentRoute = navController.currentDestination?.route
 
-                                        Column(
-                                            modifier = Modifier
-                                                .size(height = 55.dp, width = 70.dp)
-                                                .background(
-                                                    brush = if (currentScreen == "home") verticalBrush else offVerticalBrush,
-                                                    alpha = 0.4f
-                                                )
-                                                .clickable(
-                                                    onClick = {
-                                                        currentScreen = "home"
-                                                        navController.navigate("home")
-                                                    }
-                                                ),
-                                            horizontalAlignment = Alignment.CenterHorizontally
-                                        ) {
-                                            if (currentScreen == "home") {
-                                                HorizontalDivider(color = Color.Cyan, thickness = 2.dp)
-                                            }
-
-                                            Icon(
-                                                imageVector = Icons.Default.Dashboard, // ✨ Matches your document file image asset
-                                                contentDescription = "Home",
-                                                modifier = Modifier.size(35.dp),
-                                                tint = Color.Black // Automatically changes to your theme's font color state
-                                            )
-                                        }
-
-                                        Column(
-                                            modifier = Modifier
-                                                .size(height = 55.dp, width = 70.dp)
-                                                .background(
-                                                    brush = if (currentScreen == "clients") verticalBrush else offVerticalBrush,
-                                                    alpha = 0.4f
-                                                )
-                                                .clickable(
-                                                    onClick = {
-                                                        currentScreen = "clients"
-                                                        navController.navigate("clients")
-                                                    }
-                                                ),
-                                            horizontalAlignment = Alignment.CenterHorizontally
-                                        ) {
-                                            if (currentScreen == "clients") {
-                                                HorizontalDivider(color = Color.Cyan, thickness = 2.dp)
-                                            }
-
-                                            Icon(
-                                                imageVector = Icons.Default.People, // ✨ Matches your document file image asset
-                                                contentDescription = "Clients",
-                                                modifier = Modifier.size(35.dp),
-                                                tint = Color.Black // Automatically changes to your theme's font color state
-                                            )
-                                        }
-
-                                        Column(
-                                            modifier = Modifier
-                                                .size(height = 55.dp, width = 70.dp)
-                                                .background(
-                                                    brush = if (currentScreen == "settings") verticalBrush else offVerticalBrush,
-                                                    alpha = 0.4f
-                                                )
-                                                .clickable(
-                                                    onClick = {
-                                                        currentScreen = "settings"
-                                                        navController.navigate("settings")
-                                                    }
-                                                ),
-                                            horizontalAlignment = Alignment.CenterHorizontally
-                                        ) {
-                                            if (currentScreen == "settings") {
-                                                HorizontalDivider(color = Color.Cyan, thickness = 2.dp)
-                                            }
-
-                                            Icon(
-                                                imageVector = Icons.Default.Settings, // ✨ Matches your document file image asset
-                                                contentDescription = "Settings",
-                                                modifier = Modifier.size(35.dp),
-                                                tint = Color.Black // Automatically changes to your theme's font color state
-                                            )
-                                        }
-                                    }
-                                }
+                    if (currentRoute != null) {
+                        if (isSubscribed == false && currentRoute != "subscription") {
+                            navController.navigate("subscription") {
+                                popUpTo("home") { inclusive = true }
+                                launchSingleTop = true
                             }
-                        ) { innerPadding ->
-                            padding = innerPadding.calculateRightPadding(LayoutDirection.Rtl)
-
-                            NavHost(
-                                navController = navController,
-                                startDestination = "home"
-                            ) {
-                                composable("home") {
-                                    HomeScreen(viewModel, innerPadding)
-                                }
-
-                                composable("clients") {
-                                    ClientsScreen(viewModel, navController, innerPadding)
-                                }
-
-                                composable(
-                                    route = "client/{clientId}",
-                                    arguments = listOf(
-                                        navArgument("clientId") { type = NavType.IntType }
-                                    )
-                                ) { backStackEntry ->
-                                    val clientId = backStackEntry.arguments?.getInt("clientId")?: 0
-
-                                    ClientOverviewScreen(clientId, viewModel, innerPadding, navController)
-                                }
-
-                                composable(
-                                    route = "project/{projectName}/{projectId}/{clientId}",
-                                    arguments = listOf(
-                                        navArgument("projectName") { type = NavType.StringType },
-                                        navArgument("clientId") { type = NavType.IntType },
-                                        navArgument("projectId") { type = NavType.IntType }
-                                    )
-                                ) { backStackEntry ->
-                                    val projectName = backStackEntry.arguments?.getString("projectName")?: ""
-                                    val clientId = backStackEntry.arguments?.getInt("clientId")?: 0
-                                    val projectId = backStackEntry.arguments?.getInt("projectId")?: 0
-
-                                    ProjectSkeletonScreen(projectName, projectId, clientId, viewModel, innerPadding)
-                                }
-
-                                composable("profile") {
-                                    ProfileScreen(viewModel, navController, innerPadding)
-                                }
-
-                                composable("notifications") {
-                                    NotificationsScreen(viewModel, navController, innerPadding)
-                                }
-
-                                composable("settings") {
-                                    SettingsScreen(viewModel, navController, innerPadding)
-                                }
+                        } else if (isSubscribed == true && currentUser == null && currentRoute != "auth") {
+                            navController.navigate("auth") {
+                                // Safely clear backstack back to home without destroying the graph
+                                popUpTo("home") { inclusive = true }
+                                launchSingleTop = true
                             }
-                        }
-                    }
-                    else -> {
-                        NavHost(
-                            navController = navController,
-                            startDestination = "home"
-                        ) {
-                            composable("home") {
-                                SubscriptionSplashScreen(billingHelper)
+                        } else if (isSubscribed == true && currentUser != null && currentRoute == "auth") {
+                            navController.navigate("home") {
+                                popUpTo("auth") { inclusive = true }
+                                launchSingleTop = true
                             }
                         }
                     }
                 }
 
+                val diagonalGradient = Brush.linearGradient(
+                    colors = listOf(
+                        Color.White,
+                        Color(0xFFE0E0E0) // Light gray
+                    ),
+                    start = Offset(0f, 0f),           // Top-Left
+                    end = Offset.Infinite              // Bottom-Right
+                )
+
+                val horizontalGradient = Brush.linearGradient(
+                    colors = listOf(
+                        Color.White,
+                        Color(0xFFE0E0E0) // Light gray
+                    ),
+                    start = Offset(0f, 0f),
+                    end = Offset(Float.POSITIVE_INFINITY, 0f)
+                )
+
+                Scaffold(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(brush = diagonalGradient),
+                    topBar = {
+                        Row(
+                            modifier = Modifier
+                                .size(width = screenWidth, height = 55.dp)
+                                .background(color = if (currentUser == null) Color.Transparent else Color.White)
+                        ) {
+
+                        }
+                    },
+                    bottomBar = {
+                        if (currentUser != null) {
+                            Card(
+                                elevation = CardDefaults.cardElevation(
+                                    5.dp,
+                                    5.dp,
+                                    5.dp,
+                                    5.dp,
+                                    5.dp,
+                                    5.dp
+                                ),
+                                shape = RectangleShape
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .size(width = screenWidth, height = 55.dp)
+                                        .background(color = Color.White)
+                                        .navigationBarsPadding(),
+                                    horizontalArrangement = Arrangement.SpaceEvenly
+                                ) {
+                                    val verticalBrush = Brush.linearGradient(
+                                        colors = listOf(Color.Cyan, Color.White),
+                                        start = Offset(
+                                            x = 0f,
+                                            y = 0f
+                                        ), // Starts at top-left
+                                        end = Offset(
+                                            x = 0f,
+                                            y = Float.POSITIVE_INFINITY
+                                        ) // Ends at bottom-left
+                                    )
+                                    val offVerticalBrush = Brush.linearGradient(
+                                        colors = listOf(Color.White, Color.White),
+                                        start = Offset(
+                                            x = 0f,
+                                            y = 0f
+                                        ), // Starts at top-left
+                                        end = Offset(
+                                            x = 0f,
+                                            y = Float.POSITIVE_INFINITY
+                                        ) // Ends at bottom-left
+                                    )
+
+                                    Column(
+                                        modifier = Modifier
+                                            .size(height = 55.dp, width = 70.dp)
+                                            .background(
+                                                brush = if (currentScreen == "home") verticalBrush else offVerticalBrush,
+                                                alpha = 0.4f
+                                            )
+                                            .clickable(
+                                                onClick = {
+                                                    currentScreen = "home"
+                                                    navController.navigate("home") {
+                                                        popUpTo("home") { inclusive = false }
+                                                        launchSingleTop = true
+                                                        restoreState = true
+                                                    }
+                                                }
+                                            ),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        if (currentScreen == "home") {
+                                            HorizontalDivider(
+                                                color = Color.Cyan,
+                                                thickness = 2.dp
+                                            )
+                                        }
+
+                                        Icon(
+                                            imageVector = Icons.Default.Dashboard, // ✨ Matches your document file image asset
+                                            contentDescription = "Home",
+                                            modifier = Modifier.size(35.dp),
+                                            tint = Color.Black // Automatically changes to your theme's font color state
+                                        )
+                                    }
+
+                                    Column(
+                                        modifier = Modifier
+                                            .size(height = 55.dp, width = 70.dp)
+                                            .background(
+                                                brush = if (currentScreen == "clients") verticalBrush else offVerticalBrush,
+                                                alpha = 0.4f
+                                            )
+                                            .clickable(
+                                                onClick = {
+                                                    currentScreen = "clients"
+                                                    navController.navigate("clients") {
+                                                        popUpTo("home") { inclusive = false }
+                                                        launchSingleTop = true
+                                                        restoreState = true
+                                                    }
+                                                }
+                                            ),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        if (currentScreen == "clients") {
+                                            HorizontalDivider(
+                                                color = Color.Cyan,
+                                                thickness = 2.dp
+                                            )
+                                        }
+
+                                        Icon(
+                                            imageVector = Icons.Default.People, // ✨ Matches your document file image asset
+                                            contentDescription = "Clients",
+                                            modifier = Modifier.size(35.dp),
+                                            tint = Color.Black // Automatically changes to your theme's font color state
+                                        )
+                                    }
+
+                                    Column(
+                                        modifier = Modifier
+                                            .size(height = 55.dp, width = 70.dp)
+                                            .background(
+                                                brush = if (currentScreen == "settings") verticalBrush else offVerticalBrush,
+                                                alpha = 0.4f
+                                            )
+                                            .clickable(
+                                                onClick = {
+                                                    currentScreen = "settings"
+                                                    navController.navigate("settings") {
+                                                        popUpTo("home") { inclusive = false }
+                                                        launchSingleTop = true
+                                                        restoreState = true
+                                                    }
+                                                }
+                                            ),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        if (currentScreen == "settings") {
+                                            HorizontalDivider(
+                                                color = Color.Cyan,
+                                                thickness = 2.dp
+                                            )
+                                        }
+
+                                        Icon(
+                                            imageVector = Icons.Default.Settings, // ✨ Matches your document file image asset
+                                            contentDescription = "Settings",
+                                            modifier = Modifier.size(35.dp),
+                                            tint = Color.Black // Automatically changes to your theme's font color state
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ) { innerPadding ->
+                    padding = innerPadding.calculateRightPadding(LayoutDirection.Rtl)
+
+                    NavHost(
+                        navController = navController,
+                        startDestination = initialStartDestination
+                    ) {
+                        composable("subscription") {
+                            SubscriptionSplashScreen(billingHelper)
+                        }
+
+                        composable("auth") {
+                            SignInScreen(viewModel, navController, innerPadding)
+                        }
+
+                        composable("home") {
+                            HomeScreen(viewModel, innerPadding)
+                        }
+
+                        composable("clients") {
+                            ClientsScreen(viewModel, navController, innerPadding)
+                        }
+
+                        composable(
+                            route = "client/{clientId}",
+                            arguments = listOf(
+                                navArgument("clientId") { type = NavType.IntType }
+                            )
+                        ) { backStackEntry ->
+                            val clientId = backStackEntry.arguments?.getInt("clientId")?: 0
+
+                            ClientOverviewScreen(clientId, viewModel, innerPadding, navController)
+                        }
+
+                        composable(
+                            route = "project/{projectName}/{projectId}/{clientId}",
+                            arguments = listOf(
+                                navArgument("projectName") { type = NavType.StringType },
+                                navArgument("clientId") { type = NavType.IntType },
+                                navArgument("projectId") { type = NavType.IntType }
+                            )
+                        ) { backStackEntry ->
+                            val projectName = backStackEntry.arguments?.getString("projectName")?: ""
+                            val clientId = backStackEntry.arguments?.getInt("clientId")?: 0
+                            val projectId = backStackEntry.arguments?.getInt("projectId")?: 0
+
+                            ProjectSkeletonScreen(projectName, projectId, clientId, viewModel, innerPadding)
+                        }
+
+                        composable("profile") {
+                            ProfileScreen(viewModel, navController, innerPadding)
+                        }
+
+                        composable("notifications") {
+                            NotificationsScreen(viewModel, navController, innerPadding)
+                        }
+
+                        composable("settings") {
+                            SettingsScreen(viewModel, navController, innerPadding, currentUser)
+                        }
+                    }
+                }
             }
         }
     }

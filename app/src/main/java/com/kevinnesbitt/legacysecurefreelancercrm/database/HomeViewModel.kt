@@ -25,14 +25,32 @@ import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import java.util.Locale
 import android.graphics.*
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.firestore.FirebaseFirestore
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.InvoiceStatus
 import com.kevinnesbitt.legacysecurefreelancercrm.variables.SupportedCurrency
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.firebase.auth.FirebaseAuthWeakPasswordException
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.ktx.Firebase
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val db = FirebaseFirestore.getInstance()
+    private val auth = FirebaseAuth.getInstance()
     val dao = AppDao.AppDatabase.getDatabase(application).appDao()
 
     init {
@@ -266,6 +284,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 currency = currency,
                 taxBracket = taxBracket
             )
+        }
+    }
+
+    fun acceptPrivacyPolicy(status: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.acceptPrivacyPolicy(status)
+        }
+    }
+
+    fun updateUserName(selfName: String, selfEmail: String){
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.updateUserName(selfName, selfEmail)
         }
     }
 
@@ -779,6 +809,370 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     //     }
     // }
 
+    // ==========================================
+    // FIREBASE CLOUD SYNC & RESTORE
+    // ==========================================
+
+    suspend fun handleGoogleSignIn(context: Context, webClientId: String): String? {
+        val credentialManager = CredentialManager.create(context)
+
+        val googleIdOption = GetGoogleIdOption.Builder()
+            .setFilterByAuthorizedAccounts(false)
+            .setServerClientId(webClientId)
+            .setAutoSelectEnabled(true)
+            .build()
+
+        val request = GetCredentialRequest.Builder()
+            .addCredentialOption(googleIdOption)
+            .build()
+
+        return try {
+            val result = credentialManager.getCredential(context, request)
+            val credential = result.credential
+
+            // Check if it's a Google ID token credential
+            if (credential is androidx.credentials.CustomCredential &&
+                credential.type == com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+            ) {
+                val googleIdTokenCredential = com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.createFrom(credential.data)
+                googleIdTokenCredential.idToken
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun signInWithGoogle(
+        idToken: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val auth = Firebase.auth
+        val credential = GoogleAuthProvider.getCredential(idToken, null)
+
+        auth.signInWithCredential(credential)
+            .addOnSuccessListener { authResult ->
+                // Sign-in successful (either brand new, or successfully linked
+                // because Firebase recognized the matching email address).
+
+                val user = authResult.user
+                if (user != null) {
+                    // OPTIONAL: Check if multiple providers are now linked
+                    val providers = user.providerData.map { it.providerId }
+
+                    // If they successfully merged, you can log it or perform
+                    // any necessary Room database sync here using user.uid
+                }
+
+                onSuccess()
+            }
+            .addOnFailureListener { exception ->
+                // If an account-exists collision happens that requires explicit user action
+                // (e.g., security policies requiring password confirmation first),
+                // you catch it here:
+                if (exception.message?.contains("account-exists-with-different-credential") == true) {
+                    onError("An account already exists with this email. Please sign in with your password to link your accounts.")
+                } else {
+                    onError(exception.localizedMessage ?: "Google sign-in failed")
+                }
+            }
+    }
+
+    fun linkOrSignInWithGoogle(
+        idToken: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val credential = GoogleAuthProvider.getCredential(idToken, null)
+
+        // Try signing in directly with the Google credential
+        auth.signInWithCredential(credential)
+            .addOnSuccessListener {
+                // If they already linked it previously or it's a returning Google user, success!
+                onSuccess()
+            }
+            .addOnFailureListener { exception ->
+                // Check if the failure is because an account with this email already exists
+                // Firebase error codes for credential collisions:
+                // "auth/account-exists-with-different-credential"
+
+                val currentUser = auth.currentUser
+                if (currentUser != null) {
+                    // If a user is somehow partially logged in, link it directly
+                    currentUser.linkWithCredential(credential)
+                        .addOnSuccessListener { onSuccess() }
+                        .addOnFailureListener { err -> onError(err.localizedMessage ?: "Linking failed") }
+                } else {
+                    // To safely link them, you typically prompt the user to enter their
+                    // original password once to prove ownership of the email account,
+                    // then link the Google credential to that account.
+                    onError("An account with this email already exists. Please sign in with your password first, then link Google in your profile settings.")
+                }
+            }
+    }
+
+    // 1. Create a new account
+    fun signUpUser(email: String, pass: String, onResult: (Boolean, String?) -> Unit) {
+        if (email.isBlank() || pass.isBlank()) {
+            onResult(false, "Email and password cannot be empty.")
+            return
+        } else if (!(email.contains('@') && email.contains('.'))) {
+            onResult(false, "Please enter valid email")
+            return
+        }
+
+        auth.createUserWithEmailAndPassword(email, pass)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    onResult(true, "Account created successfully!")
+                } else {
+                    val exception = task.exception
+
+                    val customMessage = when(exception) {
+                        is FirebaseAuthWeakPasswordException -> {
+                            exception.reason
+                        }
+                        is FirebaseAuthException -> {
+                            when(exception.errorCode) {
+                                "ERROR_EMAIL_ALREADY_IN_USE" -> "Email already registered."
+                                "ERROR_NETWORK_REQUEST_FAILED" -> "Error! Check your internet connection and try again."
+                                else -> "Unknown error occurred. Please contact us or try again later."
+                            }
+                        }
+                        else -> "Unknown error occurred. Please contact us or try again later."
+                    }
+
+                    onResult(false, customMessage)
+                }
+            }
+    }
+
+    // 2. Sign in to an existing account
+    fun signInUser(email: String, pass: String, onResult: (Boolean, String?) -> Unit) {
+        if (email.isBlank() || pass.isBlank()) {
+            onResult(false, "Please fill in both email and password.")
+            return
+        }
+
+        auth.signInWithEmailAndPassword(email, pass)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    onResult(true, "Logged in successfully!")
+                } else {
+                    val exception = task.exception
+
+                    // Translate raw Firebase exceptions into clean, custom messages
+                    val customMessage = when (exception) {
+                        is FirebaseAuthInvalidCredentialsException -> {
+                            "Incorrect password or email. Please check your credentials and try again."
+                        }
+                        is FirebaseAuthInvalidUserException -> {
+                            "No account found with this email address."
+                        }
+                        is FirebaseAuthException -> {
+                            when (exception.errorCode) {
+                                "ERROR_INVALID_EMAIL" -> "The email address format is invalid."
+                                "ERROR_USER_DISABLED" -> "This account has been disabled."
+                                "ERROR_TOO_MANY_REQUESTS" -> "Too many failed login attempts. Please try again later."
+                                else -> "Authentication failed. Please try again."
+                            }
+                        }
+                        else -> "An unexpected error occurred. Please try again."
+                    }
+
+                    onResult(false, customMessage)
+                }
+            }
+    }
+
+    private val _currentUser = MutableStateFlow<FirebaseUser?>(auth.currentUser)
+    val currentUser: StateFlow<FirebaseUser?> = _currentUser.asStateFlow()
+
+    init {
+        // Firebase fires this listener whenever sign-in or sign-out occurs
+        auth.addAuthStateListener { firebaseAuth ->
+            _currentUser.value = firebaseAuth.currentUser
+        }
+    }
+
+    // 3. Log out
+    fun signOutUser(context: Context) {
+        viewModelScope.launch(Dispatchers.Main) {
+            // 1. Sign out of Firebase first so Compose navigates away from protected screens
+            auth.signOut()
+
+            // 2. Perform all database cleanup and default restoration on the IO thread
+            withContext(Dispatchers.IO) {
+                val database = AppDao.AppDatabase.getDatabase(context)
+                database.clearAllTables()
+
+                // Re-insert default settings here while safely on Dispatchers.IO
+                database.appDao().insertSettings(
+                    SettingsEntity(
+                        id = 1,
+                        isTiming = false,
+                        timeFormat = "12-Hour",
+                        dateFormat = "MM/dd/yyyy",
+                        selfName = "",
+                        selfAddress = "",
+                        selfEmail = "",
+                        selfTelephone = "",
+                        preferredCurrency = "USD",
+                        taxBracket = 0.0,
+                        invoiceLogoPath = "",
+                        acceptedPrivacyPolicy = false
+                    )
+                )
+            }
+        }
+    }
+
+    // 4. Helper to check current user email
+    fun getCurrentUserEmail(): String? {
+        return auth.currentUser?.email
+    }
+
+    fun syncToCloud(onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val userId = auth.currentUser?.uid
+            if (userId == null) {
+                withContext(Dispatchers.Main) {
+                    onResult(false, "User is not logged in to Firebase.")
+                }
+                return@launch
+            }
+
+            try {
+                val userDocRef = db.collection("users").document(userId)
+
+                // Read all data using your DAO queries
+                val clients = dao.getAllClientsList()
+                val projects = dao.getAllProjectsList()
+                val tasks = dao.getAllTasksList()
+                val invoices = dao.getAllInvoicesList()
+                val projectReminders = dao.getAllProjectRemindersList()
+                val taskReminders = dao.getAllTaskRemindersList()
+                val invoiceReminders = dao.getAllInvoiceRemindersList()
+                val settings = dao.getSettingsOnce()?.copy(invoiceLogoPath = "") // Reset logo path
+
+                val batch = db.batch()
+
+                // Queue settings
+                if (settings != null) {
+                    val settingsRef = userDocRef.collection("settings").document("user_settings")
+                    batch.set(settingsRef, settings)
+                }
+
+                // Queue entity collections
+                clients.forEach { client ->
+                    val ref = userDocRef.collection("clients").document(client.id.toString())
+                    batch.set(ref, client)
+                }
+
+                projects.forEach { project ->
+                    val ref = userDocRef.collection("projects").document(project.id.toString())
+                    batch.set(ref, project)
+                }
+
+                tasks.forEach { task ->
+                    val ref = userDocRef.collection("tasks").document(task.id.toString())
+                    batch.set(ref, task)
+                }
+
+                invoices.forEach { invoice ->
+                    val ref = userDocRef.collection("invoices").document(invoice.id.toString())
+                    batch.set(ref, invoice)
+                }
+
+                projectReminders.forEach { reminder ->
+                    val ref = userDocRef.collection("project_reminders").document(reminder.id.toString())
+                    batch.set(ref, reminder)
+                }
+
+                taskReminders.forEach { reminder ->
+                    val ref = userDocRef.collection("task_reminders").document(reminder.id.toString())
+                    batch.set(ref, reminder)
+                }
+
+                invoiceReminders.forEach { reminder ->
+                    val ref = userDocRef.collection("invoice_reminders").document(reminder.id.toString())
+                    batch.set(ref, reminder)
+                }
+
+                // Execute the batch upload
+                batch.commit().await()
+
+                withContext(Dispatchers.Main) {
+                    onResult(true, "Data successfully backed up to Firebase!")
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) {
+                    onResult(false, e.message ?: "Failed to sync data.")
+                }
+            }
+        }
+    }
+
+    fun restoreFromCloud(onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val userId = auth.currentUser?.uid
+            if (userId == null) {
+                withContext(Dispatchers.Main) {
+                    onResult(false, "User is not logged in to Firebase.")
+                }
+                return@launch
+            }
+
+            try {
+                val userDocRef = db.collection("users").document(userId)
+
+                // Restore Clients
+                val clientsSnap = userDocRef.collection("clients").get().await()
+                clientsSnap.documents.forEach { doc ->
+                    doc.toObject(ClientDataEntity::class.java)?.let { dao.insertClient(it) }
+                }
+
+                // Restore Projects
+                val projectsSnap = userDocRef.collection("projects").get().await()
+                projectsSnap.documents.forEach { doc ->
+                    doc.toObject(ProjectDataEntity::class.java)?.let { dao.insertProject(it) }
+                }
+
+                // Restore Tasks
+                val tasksSnap = userDocRef.collection("tasks").get().await()
+                tasksSnap.documents.forEach { doc ->
+                    doc.toObject(TaskDataEntity::class.java)?.let { dao.insertTask(it) }
+                }
+
+                // Restore Invoices
+                val invoicesSnap = userDocRef.collection("invoices").get().await()
+                invoicesSnap.documents.forEach { doc ->
+                    doc.toObject(InvoiceEntity::class.java)?.let { dao.insertInvoice(it) }
+                }
+
+                // Restore Settings
+                val settingsSnap = userDocRef.collection("settings").document("user_settings").get().await()
+                if (settingsSnap.exists()) {
+                    settingsSnap.toObject(SettingsEntity::class.java)?.copy(invoiceLogoPath = "")?.let {
+                        dao.insertSettings(it)
+                    }
+                }
+
+                withContext(Dispatchers.Main) {
+                    onResult(true, "Data successfully restored from Firebase!")
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) {
+                    onResult(false, e.message ?: "Failed to restore data.")
+                }
+            }
+        }
+    }
+
 // ─── PDF Generator ───────────────────────────────────────────
 
     object InvoicePdfGenerator {
@@ -1047,6 +1441,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             canvas.drawText(text, x - width, y, paint)
         }
     }
+
+
 
     // ─── Data Models ─────────────────────────────────────────────
 

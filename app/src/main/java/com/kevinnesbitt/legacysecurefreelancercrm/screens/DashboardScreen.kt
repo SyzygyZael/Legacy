@@ -79,6 +79,10 @@ fun HomeScreen(viewModel: HomeViewModel, innerPadding: PaddingValues) {
     }?.projects?.find { it.status == ProjectStatus.ACTIVE.name }
     // val activeProjectClient = clientState.find { it.id == (activeProject?.clientId?: 0) }
 
+    val userName = settings.selfName.split(" ")[0]
+
+    android.util.Log.d("User Name", "Name: ${settings.selfName}")
+
     val allProjects = clientState.flatMap { client ->
         client.projects
     }
@@ -129,7 +133,7 @@ fun HomeScreen(viewModel: HomeViewModel, innerPadding: PaddingValues) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = " Dashboard",
+                    text = if (userName == "") " Dashboard" else " Hello $userName.",
                     fontSize = 25.sp,
                     fontWeight = Bold,
                     fontFamily = FontFamily.SansSerif,
